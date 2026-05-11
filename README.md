@@ -150,16 +150,34 @@ scoutpack search "auth middleware" --limit 5
 Searches the local index and returns ranked files/symbols with reasons.
 
 ```bash
+scoutpack search "auth middleware" --limit 5 --json
+```
+
+Returns machine-readable JSON for scripts and tools.
+
+```bash
 scoutpack context "fix login redirect loop" --budget 2500
 ```
 
 Builds a markdown packet for an AI coding task.
 
 ```bash
+scoutpack context "fix login redirect loop" --budget 2500 --json
+```
+
+Returns the context packet plus metadata as JSON.
+
+```bash
 scoutpack stats
 ```
 
 Shows local index counts and manifest details.
+
+```bash
+scoutpack stats --json
+```
+
+Returns index stats and manifest data as JSON.
 
 ## Supported In v0.1
 

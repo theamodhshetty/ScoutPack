@@ -103,6 +103,20 @@ fn init_pack_search_context_stats_work() {
         "{search_out}"
     );
 
+    let search_json = Command::new(bin())
+        .args(["search", "auth middleware", "--limit", "5", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        search_json.status.success(),
+        "{}",
+        String::from_utf8_lossy(&search_json.stderr)
+    );
+    let search_json_value: serde_json::Value = serde_json::from_slice(&search_json.stdout).unwrap();
+    assert_eq!(search_json_value["query"], "auth middleware");
+    assert!(search_json_value["results"].is_array());
+
     let context = Command::new(bin())
         .args(["context", "fix login redirect loop", "--budget", "2000"])
         .current_dir(temp.path())
@@ -129,6 +143,30 @@ fn init_pack_search_context_stats_work() {
     );
     assert!(context_out.contains("(source:"), "{context_out}");
     assert!(context_out.contains("vitest"), "{context_out}");
+
+    let context_json = Command::new(bin())
+        .args([
+            "context",
+            "fix login redirect loop",
+            "--budget",
+            "2000",
+            "--json",
+        ])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        context_json.status.success(),
+        "{}",
+        String::from_utf8_lossy(&context_json.stderr)
+    );
+    let context_json_value: serde_json::Value =
+        serde_json::from_slice(&context_json.stdout).unwrap();
+    assert_eq!(context_json_value["task"], "fix login redirect loop");
+    assert!(context_json_value["packet"]
+        .as_str()
+        .unwrap()
+        .contains("Risks:"));
 
     let tiny_context = Command::new(bin())
         .args(["context", "fix login redirect loop", "--budget", "300"])
@@ -161,4 +199,17 @@ fn init_pack_search_context_stats_work() {
     );
     let stats_out = String::from_utf8_lossy(&stats.stdout);
     assert!(stats_out.contains("Files:"), "{stats_out}");
+
+    let stats_json = Command::new(bin())
+        .args(["stats", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        stats_json.status.success(),
+        "{}",
+        String::from_utf8_lossy(&stats_json.stderr)
+    );
+    let stats_json_value: serde_json::Value = serde_json::from_slice(&stats_json.stdout).unwrap();
+    assert!(stats_json_value["file_count"].as_i64().unwrap() > 0);
 }

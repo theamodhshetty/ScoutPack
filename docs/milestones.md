@@ -70,6 +70,12 @@ ScoutPack development stays milestone-driven. Each major milestone should end wi
 - installation docs
 - README demo output and support matrix
 
+### M8.1: Machine-readable CLI Output
+
+- `search --json`
+- `context --json`
+- `stats --json`
+
 ## Next
 
 ### M9: MCP v0.2

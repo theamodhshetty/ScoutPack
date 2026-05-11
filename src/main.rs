@@ -38,17 +38,30 @@ fn main() -> Result<()> {
             query,
             limit,
             show_snippets,
+            json,
         } => {
             let results = search::search_current_dir(&query, limit, show_snippets)?;
-            output::print_search_results(&results);
+            if json {
+                output::print_search_results_json(&query, &results)?;
+            } else {
+                output::print_search_results(&results);
+            }
         }
-        Commands::Context { task, budget } => {
+        Commands::Context { task, budget, json } => {
             let packet = context::build_context_packet(".", &task, budget)?;
-            print!("{packet}");
+            if json {
+                output::print_context_json(&task, budget, &packet)?;
+            } else {
+                print!("{packet}");
+            }
         }
-        Commands::Stats { path } => {
+        Commands::Stats { path, json } => {
             let stats = index::read_stats(&path)?;
-            output::print_stats(&stats);
+            if json {
+                output::print_stats_json(&stats)?;
+            } else {
+                output::print_stats(&stats);
+            }
         }
     }
 

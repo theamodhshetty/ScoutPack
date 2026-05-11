@@ -4,7 +4,9 @@ All notable ScoutPack changes are tracked here.
 
 ## Unreleased
 
-No unreleased changes yet.
+### Added
+
+- Machine-readable JSON output for `search`, `context`, and `stats`.
 
 ## v0.1.0 - 2026-05-12
 

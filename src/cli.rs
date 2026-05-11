@@ -36,6 +36,9 @@ pub enum Commands {
 
         #[arg(long, default_value_t = false)]
         show_snippets: bool,
+
+        #[arg(long, default_value_t = false)]
+        json: bool,
     },
 
     /// Build a compact task-specific markdown context packet.
@@ -44,11 +47,17 @@ pub enum Commands {
 
         #[arg(short, long)]
         budget: Option<usize>,
+
+        #[arg(long, default_value_t = false)]
+        json: bool,
     },
 
     /// Show index stats.
     Stats {
         #[arg(default_value = ".")]
         path: PathBuf,
+
+        #[arg(long, default_value_t = false)]
+        json: bool,
     },
 }

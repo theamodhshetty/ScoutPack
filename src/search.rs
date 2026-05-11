@@ -1,13 +1,14 @@
 use crate::{config, index};
 use anyhow::Result;
 use rusqlite::{params, Connection, OptionalExtension};
+use serde::Serialize;
 use std::{
     cmp::Ordering,
     collections::{HashMap, HashSet},
     path::{Component, Path, PathBuf},
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct SearchResult {
     pub path: String,
     pub kind: String,
