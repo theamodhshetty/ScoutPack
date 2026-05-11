@@ -60,7 +60,7 @@ pub fn build_context_packet(
         }
     }
 
-    let suffix = required_tail(&commands, task);
+    let suffix = required_tail(&commands, task, &results);
     let mut snippet_section = String::from("\nRelevant Snippets:\n");
     if results.is_empty() || budget < 600 {
         snippet_section.push_str("- Unknown from index\n");
@@ -95,7 +95,11 @@ pub fn build_context_packet(
     }
 }
 
-fn required_tail(commands: &[(String, String, String)], task: &str) -> String {
+fn required_tail(
+    commands: &[(String, String, String)],
+    task: &str,
+    results: &[search::SearchResult],
+) -> String {
     let mut tail = String::new();
     tail.push_str("\nCommands:\n");
     let relevant_commands: Vec<_> = commands
@@ -111,7 +115,7 @@ fn required_tail(commands: &[(String, String, String)], task: &str) -> String {
     }
 
     tail.push_str("\nRisks:\n");
-    let risks = risk_hints(task);
+    let risks = risk_hints(task, results);
     if risks.is_empty() {
         tail.push_str("- Unknown from index\n");
     } else {
@@ -187,18 +191,65 @@ fn likely_edit_areas(task: &str, results: &[search::SearchResult]) -> Vec<String
     areas
 }
 
-fn risk_hints(task: &str) -> Vec<&'static str> {
+fn risk_hints(task: &str, results: &[search::SearchResult]) -> Vec<String> {
     let task = task.to_ascii_lowercase();
     let mut risks = Vec::new();
-    if task.contains("redirect") || task.contains("login") || task.contains("auth") {
-        risks.push("redirect loop if post-login destination points back to login or auth guard");
-        risks.push("SSR/client mismatch if session state is checked only client-side");
+    let redirect_sources = evidence_sources(results, &["redirect", "login"]);
+    let session_sources = evidence_sources(results, &["session", "auth", "getsession"]);
+
+    if (task.contains("redirect") || task.contains("login") || task.contains("auth"))
+        && !redirect_sources.is_empty()
+    {
+        risks.push(format!(
+            "redirect loop if post-login destination points back to login or auth guard (source: {})",
+            redirect_sources.join(", ")
+        ));
+    }
+    if (task.contains("login") || task.contains("auth")) && !session_sources.is_empty() {
+        risks.push(format!(
+            "SSR/client mismatch if session state is checked only client-side (source: {})",
+            session_sources.join(", ")
+        ));
     }
     if task.contains("env") || task.contains("secret") {
-        risks.push("secret files are intentionally not indexed; verify env names manually");
+        risks.push(
+            "secret files are intentionally not indexed; verify env names manually".to_owned(),
+        );
     }
     if task.contains("test") {
-        risks.push("test command exists in index, but ScoutPack does not execute project scripts");
+        risks.push(
+            "test command exists in index, but ScoutPack does not execute project scripts"
+                .to_owned(),
+        );
     }
     risks
+}
+
+fn evidence_sources(results: &[search::SearchResult], terms: &[&str]) -> Vec<String> {
+    let mut sources = Vec::new();
+    for result in results {
+        let text = result
+            .text
+            .as_deref()
+            .unwrap_or_default()
+            .to_ascii_lowercase();
+        let path = result.path.to_ascii_lowercase();
+        if !terms
+            .iter()
+            .any(|term| text.contains(term) || path.contains(term))
+        {
+            continue;
+        }
+        let source = format!(
+            "`{}:{}-{}`",
+            result.path, result.start_line, result.end_line
+        );
+        if !sources.contains(&source) {
+            sources.push(source);
+        }
+        if sources.len() == 3 {
+            break;
+        }
+    }
+    sources
 }

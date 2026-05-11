@@ -62,6 +62,7 @@ ScoutPack development stays milestone-driven. Each major milestone should end wi
 - add import proximity boost
 - prefer likely edit source files over docs for coding tasks
 - ground risk hints with indexed evidence
+- cite source ranges for context packet risk hints
 
 ### M8: Public Release Prep
 

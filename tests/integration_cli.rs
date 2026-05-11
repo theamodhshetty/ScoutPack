@@ -127,6 +127,7 @@ fn init_pack_search_context_stats_work() {
             < context_out.find("README.md").unwrap_or(usize::MAX),
         "{context_out}"
     );
+    assert!(context_out.contains("(source:"), "{context_out}");
     assert!(context_out.contains("vitest"), "{context_out}");
 
     let tiny_context = Command::new(bin())
