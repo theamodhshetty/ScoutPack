@@ -8,6 +8,7 @@
 - package.json script and framework detection.
 - Token-budgeted markdown context packets.
 - No cloud calls, telemetry, auto-edits, or project command execution.
+- Incremental indexing for unchanged files.
 
 ## v0.2
 
@@ -21,3 +22,4 @@
 - Local vector search only after deterministic ranking works.
 - crates.io, Homebrew, and optional npm wrapper distribution.
 
+See [docs/milestones.md](docs/milestones.md) for milestone tracking.
