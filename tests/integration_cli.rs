@@ -58,6 +58,28 @@ fn init_pack_search_context_stats_work() {
     );
     assert!(temp.path().join(".scoutpack/pack.sqlite").exists());
 
+    let second_pack = Command::new(bin())
+        .arg("pack")
+        .arg(".")
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        second_pack.status.success(),
+        "{}",
+        String::from_utf8_lossy(&second_pack.stderr)
+    );
+    let second_pack_out = String::from_utf8_lossy(&second_pack.stdout);
+    assert!(
+        second_pack_out.contains("Indexed 0 files"),
+        "{second_pack_out}"
+    );
+    assert!(second_pack_out.contains("reused "), "{second_pack_out}");
+    assert!(
+        second_pack_out.contains("added 0 chunks"),
+        "{second_pack_out}"
+    );
+
     let search = Command::new(bin())
         .args(["search", "auth middleware", "--limit", "5"])
         .current_dir(temp.path())

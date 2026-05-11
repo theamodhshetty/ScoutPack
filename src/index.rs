@@ -1,8 +1,9 @@
 use crate::{chunk, config, git, scanner};
 use anyhow::{Context, Result};
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OptionalExtension, Transaction};
 use serde::{Deserialize, Serialize};
 use std::{
+    collections::{HashMap, HashSet},
     fs,
     path::{Path, PathBuf},
     time::{SystemTime, UNIX_EPOCH},
@@ -12,11 +13,13 @@ const INDEX_DIR: &str = ".scoutpack";
 const DB_FILE: &str = "pack.sqlite";
 const MANIFEST_FILE: &str = "manifest.json";
 const REPO_MAP_FILE: &str = "repo-map.md";
-const SCHEMA_VERSION: i64 = 1;
+const SCHEMA_VERSION: i64 = 2;
 
 #[derive(Debug)]
 pub struct PackSummary {
     pub files_indexed: usize,
+    pub files_reused: usize,
+    pub files_removed: usize,
     pub chunks_indexed: usize,
     pub files_skipped: usize,
     pub index_path: PathBuf,
@@ -72,89 +75,50 @@ pub fn pack_repo(root: &Path) -> Result<PackSummary> {
     let db_path = scout_dir.join(DB_FILE);
     let mut conn = Connection::open(&db_path)
         .with_context(|| format!("Could not open SQLite index {}", db_path.display()))?;
-    recreate_schema(&conn)?;
+    ensure_schema(&conn)?;
+
+    let existing = existing_files(&conn)?;
+    let scan_paths: HashSet<&str> = scan
+        .files
+        .iter()
+        .map(|file| file.rel_path.as_str())
+        .collect();
+    let files_removed = existing
+        .keys()
+        .filter(|path| !scan_paths.contains(path.as_str()))
+        .count();
 
     let indexed_at = now_unix();
     let tx = conn.transaction()?;
+    tx.execute("DELETE FROM skipped_files", [])?;
+
     let mut chunks_indexed = 0usize;
+    let mut files_indexed = 0usize;
+    let mut files_reused = 0usize;
+
+    for (path, existing_file) in &existing {
+        let changed = scan
+            .files
+            .iter()
+            .find(|file| file.rel_path == *path)
+            .is_some_and(|file| file.hash != existing_file.hash);
+        let removed = !scan_paths.contains(path.as_str());
+        if changed || removed {
+            delete_file(&tx, existing_file.id, path)?;
+        }
+    }
 
     for file in &scan.files {
-        tx.execute(
-            "INSERT INTO files (path, language, kind, size_bytes, hash, mtime, indexed_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-            params![
-                file.rel_path,
-                file.language,
-                file.kind,
-                file.size_bytes as i64,
-                file.hash,
-                file.mtime,
-                indexed_at
-            ],
-        )?;
-        let file_id = tx.last_insert_rowid();
-        let chunked = chunk::chunk_file(&file.rel_path, &file.language, &file.text);
-
-        for chunk in chunked.chunks {
-            let chunk_kind = chunk.kind;
-            let chunk_name = chunk.name;
-            let chunk_text = chunk.text;
-            tx.execute(
-                "INSERT INTO chunks (file_id, kind, name, start_line, end_line, text)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-                params![
-                    file_id,
-                    &chunk_kind,
-                    &chunk_name,
-                    chunk.start_line as i64,
-                    chunk.end_line as i64,
-                    &chunk_text
-                ],
-            )?;
-            let chunk_id = tx.last_insert_rowid();
-            tx.execute(
-                "INSERT INTO chunks_fts (rowid, path, kind, name, text)
-                 VALUES (?1, ?2, ?3, ?4, ?5)",
-                params![
-                    chunk_id,
-                    &file.rel_path,
-                    &chunk_kind,
-                    &chunk_name.clone().unwrap_or_default(),
-                    &chunk_text
-                ],
-            )?;
-            chunks_indexed += 1;
+        if existing
+            .get(&file.rel_path)
+            .is_some_and(|existing_file| existing_file.hash == file.hash)
+        {
+            files_reused += 1;
+            continue;
         }
 
-        for symbol in chunked.symbols {
-            tx.execute(
-                "INSERT INTO symbols (file_id, name, kind, start_line, end_line)
-                 VALUES (?1, ?2, ?3, ?4, ?5)",
-                params![
-                    file_id,
-                    symbol.name,
-                    symbol.kind,
-                    symbol.start_line as i64,
-                    symbol.end_line as i64
-                ],
-            )?;
-        }
-
-        for import in chunked.imports {
-            tx.execute(
-                "INSERT INTO imports (from_file_id, to_path, symbol)
-                 VALUES (?1, ?2, ?3)",
-                params![file_id, import.to_path, import.symbol],
-            )?;
-        }
-
-        for command in chunked.commands {
-            tx.execute(
-                "INSERT INTO commands (name, command, source)
-                 VALUES (?1, ?2, ?3)",
-                params![command.name, command.command, command.source],
-            )?;
-        }
+        chunks_indexed += insert_scanned_file(&tx, file, indexed_at)?;
+        files_indexed += 1;
     }
 
     for skipped in &scan.skipped {
@@ -164,6 +128,7 @@ pub fn pack_repo(root: &Path) -> Result<PackSummary> {
         )?;
     }
     tx.commit()?;
+    rebuild_fts(&conn)?;
 
     let manifest = Manifest {
         scoutpack_version: env!("CARGO_PKG_VERSION").to_owned(),
@@ -187,7 +152,9 @@ pub fn pack_repo(root: &Path) -> Result<PackSummary> {
     )?;
 
     Ok(PackSummary {
-        files_indexed: scan.files.len(),
+        files_indexed,
+        files_reused,
+        files_removed,
         chunks_indexed,
         files_skipped: scan.skipped.len(),
         index_path: db_path,
@@ -251,6 +218,163 @@ pub fn framework_signals(conn: &Connection) -> Result<Vec<String>> {
     Ok(signals)
 }
 
+#[derive(Debug)]
+struct ExistingFile {
+    id: i64,
+    hash: String,
+}
+
+fn existing_files(conn: &Connection) -> Result<HashMap<String, ExistingFile>> {
+    let mut stmt = conn.prepare("SELECT id, path, hash FROM files")?;
+    let rows = stmt.query_map([], |row| {
+        Ok((
+            row.get::<_, String>(1)?,
+            ExistingFile {
+                id: row.get(0)?,
+                hash: row.get(2)?,
+            },
+        ))
+    })?;
+    rows.collect::<rusqlite::Result<HashMap<_, _>>>()
+        .map_err(Into::into)
+}
+
+fn insert_scanned_file(
+    tx: &Transaction<'_>,
+    file: &scanner::ScannedFile,
+    indexed_at: i64,
+) -> Result<usize> {
+    tx.execute(
+        "INSERT INTO files (path, language, kind, size_bytes, hash, mtime, indexed_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        params![
+            file.rel_path,
+            file.language,
+            file.kind,
+            file.size_bytes as i64,
+            file.hash,
+            file.mtime,
+            indexed_at
+        ],
+    )?;
+    let file_id = tx.last_insert_rowid();
+    let chunked = chunk::chunk_file(&file.rel_path, &file.language, &file.text);
+    let chunk_count = chunked.chunks.len();
+
+    for chunk in chunked.chunks {
+        tx.execute(
+            "INSERT INTO chunks (file_id, kind, name, start_line, end_line, text)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![
+                file_id,
+                chunk.kind,
+                chunk.name,
+                chunk.start_line as i64,
+                chunk.end_line as i64,
+                chunk.text
+            ],
+        )?;
+    }
+
+    for symbol in chunked.symbols {
+        tx.execute(
+            "INSERT INTO symbols (file_id, name, kind, start_line, end_line)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![
+                file_id,
+                symbol.name,
+                symbol.kind,
+                symbol.start_line as i64,
+                symbol.end_line as i64
+            ],
+        )?;
+    }
+
+    for import in chunked.imports {
+        tx.execute(
+            "INSERT INTO imports (from_file_id, to_path, symbol)
+             VALUES (?1, ?2, ?3)",
+            params![file_id, import.to_path, import.symbol],
+        )?;
+    }
+
+    for command in chunked.commands {
+        tx.execute(
+            "INSERT INTO commands (name, command, source)
+             VALUES (?1, ?2, ?3)",
+            params![command.name, command.command, command.source],
+        )?;
+    }
+
+    Ok(chunk_count)
+}
+
+fn delete_file(tx: &Transaction<'_>, file_id: i64, path: &str) -> Result<()> {
+    tx.execute(
+        "DELETE FROM imports WHERE from_file_id = ?1",
+        params![file_id],
+    )?;
+    tx.execute("DELETE FROM symbols WHERE file_id = ?1", params![file_id])?;
+    tx.execute("DELETE FROM chunks WHERE file_id = ?1", params![file_id])?;
+    tx.execute("DELETE FROM commands WHERE source = ?1", params![path])?;
+    tx.execute("DELETE FROM files WHERE id = ?1", params![file_id])?;
+    Ok(())
+}
+
+fn rebuild_fts(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        "
+        DROP TABLE IF EXISTS chunks_fts;
+        CREATE VIRTUAL TABLE chunks_fts USING fts5(
+          path,
+          kind,
+          name,
+          text,
+          tokenize='unicode61'
+        );
+        INSERT INTO chunks_fts (rowid, path, kind, name, text)
+        SELECT c.id, f.path, c.kind, COALESCE(c.name, ''), c.text
+        FROM chunks c
+        JOIN files f ON c.file_id = f.id;
+        ",
+    )?;
+    Ok(())
+}
+
+fn ensure_schema(conn: &Connection) -> Result<()> {
+    if schema_version(conn)? != Some(SCHEMA_VERSION) {
+        recreate_schema(conn)?;
+    }
+    Ok(())
+}
+
+fn schema_version(conn: &Connection) -> Result<Option<i64>> {
+    if !table_exists(conn, "meta")? {
+        return Ok(None);
+    }
+    let version = conn
+        .query_row(
+            "SELECT value FROM meta WHERE key = 'schema_version'",
+            [],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()?
+        .and_then(|value| value.parse::<i64>().ok());
+    Ok(version)
+}
+
+fn table_exists(conn: &Connection, table: &str) -> Result<bool> {
+    let exists = conn
+        .query_row(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?1",
+            params![table],
+            |_| Ok(()),
+        )
+        .optional()?
+        .is_some();
+    Ok(exists)
+}
+
 fn recreate_schema(conn: &Connection) -> Result<()> {
     conn.execute_batch(
         "
@@ -262,7 +386,13 @@ fn recreate_schema(conn: &Connection) -> Result<()> {
         DROP TABLE IF EXISTS commands;
         DROP TABLE IF EXISTS skipped_files;
         DROP TABLE IF EXISTS files;
+        DROP TABLE IF EXISTS meta;
         PRAGMA foreign_keys = ON;
+
+        CREATE TABLE meta (
+          key TEXT PRIMARY KEY,
+          value TEXT NOT NULL
+        );
 
         CREATE TABLE files (
           id INTEGER PRIMARY KEY,
@@ -322,10 +452,13 @@ fn recreate_schema(conn: &Connection) -> Result<()> {
           kind,
           name,
           text,
-          content='',
           tokenize='unicode61'
         );
         ",
+    )?;
+    conn.execute(
+        "INSERT INTO meta (key, value) VALUES ('schema_version', ?1)",
+        params![SCHEMA_VERSION.to_string()],
     )?;
     Ok(())
 }

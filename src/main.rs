@@ -25,8 +25,12 @@ fn main() -> Result<()> {
         Commands::Pack { path } => {
             let summary = index::pack_repo(&path)?;
             println!(
-                "Indexed {} files, {} chunks, skipped {} files.",
-                summary.files_indexed, summary.chunks_indexed, summary.files_skipped
+                "Indexed {} files, reused {} unchanged, removed {}, added {} chunks, skipped {} files.",
+                summary.files_indexed,
+                summary.files_reused,
+                summary.files_removed,
+                summary.chunks_indexed,
+                summary.files_skipped
             );
             println!("Index: {}", summary.index_path.display());
         }

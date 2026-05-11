@@ -1,6 +1,6 @@
 # ScoutPack
 
-[![CI](https://github.com/amodhshetty/ScoutPack/actions/workflows/ci.yml/badge.svg)](https://github.com/amodhshetty/ScoutPack/actions/workflows/ci.yml)
+[![CI](https://github.com/theamodhshetty/ScoutPack/actions/workflows/ci.yml/badge.svg)](https://github.com/theamodhshetty/ScoutPack/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 Offline repo context for AI agents.
