@@ -11,7 +11,9 @@ pub fn build_context_packet(
     let config = crate::config::load(root)?;
     let budget = budget.unwrap_or(config.default_budget);
     let conn = index::ensure_index(root)?;
-    let results = search::search_repo(root, task, 12, true)?;
+    let mut results = search::search_repo(root, task, 12, true)?;
+    let neighbors = search::enrich_with_import_neighbors(root, &results, 4, true)?;
+    merge_results(&mut results, neighbors);
     let commands = index::read_commands(&conn)?;
     let frameworks = index::framework_signals(&conn)?;
 
@@ -118,6 +120,24 @@ fn required_tail(commands: &[(String, String, String)], task: &str) -> String {
         }
     }
     tail
+}
+
+fn merge_results(results: &mut Vec<search::SearchResult>, extra: Vec<search::SearchResult>) {
+    for result in extra {
+        if results.iter().any(|existing| {
+            existing.path == result.path
+                && existing.start_line == result.start_line
+                && existing.end_line == result.end_line
+        }) {
+            continue;
+        }
+        results.push(result);
+    }
+    results.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
 }
 
 fn relevant_files(results: &[search::SearchResult]) -> Vec<(String, String)> {

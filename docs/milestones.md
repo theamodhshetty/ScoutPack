@@ -60,6 +60,7 @@ ScoutPack development stays milestone-driven. Each major milestone should end wi
 - keep relevant files in ranking order
 - improve task-term ranking
 - add import proximity boost
+- prefer likely edit source files over docs for coding tasks
 - ground risk hints with indexed evidence
 
 ### M8: Public Release Prep

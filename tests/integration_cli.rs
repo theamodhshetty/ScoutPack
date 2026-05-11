@@ -95,6 +95,13 @@ fn init_pack_search_context_stats_work() {
         search_out.contains("src/middleware/auth.ts"),
         "{search_out}"
     );
+    assert!(
+        search_out
+            .find("src/middleware/auth.ts")
+            .unwrap_or(usize::MAX)
+            < search_out.find("README.md").unwrap_or(usize::MAX),
+        "{search_out}"
+    );
 
     let context = Command::new(bin())
         .args(["context", "fix login redirect loop", "--budget", "2000"])
@@ -110,6 +117,14 @@ fn init_pack_search_context_stats_work() {
     assert!(context_out.contains("# ScoutPack Context"), "{context_out}");
     assert!(
         context_out.contains("src/app/login/page.tsx"),
+        "{context_out}"
+    );
+    assert!(context_out.contains("src/lib/session.ts"), "{context_out}");
+    assert!(
+        context_out
+            .find("src/app/login/page.tsx")
+            .unwrap_or(usize::MAX)
+            < context_out.find("README.md").unwrap_or(usize::MAX),
         "{context_out}"
     );
     assert!(context_out.contains("vitest"), "{context_out}");
