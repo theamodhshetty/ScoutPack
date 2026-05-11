@@ -11,12 +11,28 @@ scoutpack mcp .
 
 ## Client Config
 
-Use the installed `scoutpack` binary:
+Most MCP clients use one of two local stdio config shapes.
+
+Claude Code, Cursor-style, and many MCP clients:
 
 ```json
 {
   "mcpServers": {
     "scoutpack": {
+      "command": "scoutpack",
+      "args": ["mcp", "."]
+    }
+  }
+}
+```
+
+VS Code / GitHub Copilot workspace config:
+
+```json
+{
+  "servers": {
+    "scoutpack": {
+      "type": "stdio",
       "command": "scoutpack",
       "args": ["mcp", "."]
     }
@@ -37,6 +53,8 @@ From a local checkout:
 }
 ```
 
+Claude Code project-scoped config can live in `.mcp.json`. VS Code stores workspace MCP config in `.vscode/mcp.json`.
+
 ## Tools
 
 | Tool | Purpose |
@@ -53,3 +71,9 @@ From a local checkout:
 - Run `scoutpack pack .` again after meaningful repo changes.
 - MCP tools require an existing `.scoutpack/pack.sqlite`.
 - Tool responses include structured JSON plus text content for broad client compatibility.
+
+## Client Docs
+
+- [Claude Code MCP](https://code.claude.com/docs/en/mcp)
+- [VS Code MCP configuration](https://code.visualstudio.com/docs/copilot/reference/mcp-configuration)
+- [OpenAI Codex MCP overview](https://developers.openai.com/learn/docs-mcp)

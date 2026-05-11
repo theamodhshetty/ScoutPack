@@ -95,6 +95,13 @@ ScoutPack development stays milestone-driven. Each major milestone should end wi
 - MCP setup surfaced on main page
 - discoverability search terms kept visible
 
+### M10.2: Agent Adoption Docs
+
+- efficiency model graphic
+- MCP config examples for common clients
+- agent workflow matrix
+- AGENTS.md usage hint
+
 ## Next
 
 ### M11: Index Coverage

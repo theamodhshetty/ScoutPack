@@ -10,6 +10,7 @@ All notable ScoutPack changes are tracked here.
 - Read-only MCP server with `search`, `context`, `file_summary`, `symbol`, `commands`, and `stats` tools.
 - Shell completion generation for bash, zsh, fish, PowerShell, and Elvish.
 - Project logo and redesigned README landing page.
+- Efficiency model graphic and agent client setup docs for MCP, Codex, Claude Code, GitHub Copilot, Cursor, and Aider.
 - Discoverability docs for AI agent workflows, use cases, and FAQ.
 - GitHub issue templates and pull request template.
 

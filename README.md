@@ -20,8 +20,10 @@
 
 <p align="center">
   <a href="#quick-start">Quick Start</a> ·
+  <a href="#efficiency-model">Efficiency</a> ·
   <a href="#demo">Demo</a> ·
   <a href="#mcp-server">MCP</a> ·
+  <a href="#agent-client-setup">Agents</a> ·
   <a href="#commands">Commands</a> ·
   <a href="docs/installation.md">Install</a> ·
   <a href="docs/milestones.md">Roadmap</a>
@@ -82,6 +84,22 @@ Risks:
 ```
 
 No cloud. No API key. No telemetry. No auto-edits. No project command execution.
+
+## Efficiency Model
+
+<p align="center">
+  <img src="assets/scoutpack-efficiency.svg" width="760" alt="ScoutPack efficiency model">
+</p>
+
+This is budget math, not a benchmark claim: if an agent would otherwise read broad files and chat history before finding the right area, ScoutPack lets you start from a focused packet such as `--budget 2500`.
+
+| Efficiency lever | How ScoutPack helps |
+| --- | --- |
+| Fewer wasted reads | ranked search points at likely edit files first |
+| Smaller first prompt | `context --budget` trims snippets to a fixed target |
+| Less manual setup | package scripts, framework signals, and risks are included |
+| Better handoff | Markdown, JSON, and MCP all expose the same local index |
+| Safer context | common secret files skipped before indexing |
 
 ## What You Get
 
@@ -211,6 +229,46 @@ Available tools:
 | `stats` | index counts and manifest details |
 
 Full setup: [docs/mcp.md](docs/mcp.md).
+
+## Agent Client Setup
+
+| Client | Fast path | Notes |
+| --- | --- | --- |
+| Codex | Run `scoutpack context "task" --budget 2500`, paste packet into task. | MCP users can configure ScoutPack as a local stdio MCP server. |
+| Claude Code | Add ScoutPack via `.mcp.json` or `claude mcp add`, then ask Claude to use `scoutpack.context`. | Best for repeated repo work. |
+| GitHub Copilot / VS Code | Add ScoutPack to `.vscode/mcp.json`, open Copilot Chat Agent mode, enable tools. | Uses VS Code MCP config format. |
+| Cursor | Add ScoutPack to Cursor MCP config or paste `context` output. | Same read-only tools. |
+| Aider | Use `search` output to choose files, then add them to Aider. | Good when you want explicit file control. |
+| Scripts/CI helpers | Use `search --json`, `context --json`, `stats --json`. | Stable machine-readable output. |
+
+Shared local stdio server:
+
+```json
+{
+  "mcpServers": {
+    "scoutpack": {
+      "command": "scoutpack",
+      "args": ["mcp", "."]
+    }
+  }
+}
+```
+
+VS Code / GitHub Copilot workspace config uses `servers`:
+
+```json
+{
+  "servers": {
+    "scoutpack": {
+      "type": "stdio",
+      "command": "scoutpack",
+      "args": ["mcp", "."]
+    }
+  }
+}
+```
+
+More workflows: [docs/ai-agent-workflows.md](docs/ai-agent-workflows.md).
 
 ## Commands
 
