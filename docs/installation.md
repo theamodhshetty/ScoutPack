@@ -73,3 +73,12 @@ scoutpack.toml
 
 `.scoutpack/` is local index data and should not be committed.
 
+## Agent-Friendly Commands
+
+```bash
+scoutpack search "auth middleware" --json
+scoutpack context "fix login redirect loop" --budget 2500 --json
+scoutpack stats --json
+```
+
+Use JSON output when building wrappers, scripts, or MCP clients.

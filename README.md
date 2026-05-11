@@ -5,7 +5,9 @@
 
 Offline repo context for AI agents.
 
-ScoutPack scans a local project, builds a searchable SQLite index, and returns compact task-specific context packets for AI coding agents. It helps Codex, Claude Code, Cursor, Aider, and similar tools start with better repo context instead of reading random files.
+ScoutPack is an offline repo context compiler for AI coding agents. It scans a local project, builds a searchable SQLite index, and returns compact task-specific context packets for Codex, Claude Code, Cursor, Aider, and similar tools.
+
+Use it when an AI coding assistant needs to know which files, symbols, snippets, commands, and risks matter before it starts editing.
 
 ```bash
 scoutpack pack .
@@ -13,6 +15,18 @@ scoutpack context "fix login redirect loop" --budget 2500
 ```
 
 No cloud. No API key. No telemetry. No auto-edits. No project command execution.
+
+## Also Known As
+
+People may describe this problem as:
+
+- AI coding agent context
+- local codebase search for AI
+- offline repo indexing
+- context engineering for code
+- local-first RAG alternative for private repos
+- token-budgeted code context
+- repo map for AI assistants
 
 ## Why ScoutPack
 
@@ -216,6 +230,9 @@ Security details: [SECURITY.md](SECURITY.md).
 ## Docs
 
 - [Installation](docs/installation.md)
+- [AI agent workflows](docs/ai-agent-workflows.md)
+- [Use cases](docs/use-cases.md)
+- [FAQ](docs/faq.md)
 - [Design](docs/design.md)
 - [Milestones](docs/milestones.md)
 - [Release checklist](docs/release-checklist.md)

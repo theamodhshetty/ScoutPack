@@ -7,6 +7,8 @@ All notable ScoutPack changes are tracked here.
 ### Added
 
 - Machine-readable JSON output for `search`, `context`, and `stats`.
+- Discoverability docs for AI agent workflows, use cases, and FAQ.
+- GitHub issue templates and pull request template.
 
 ## v0.1.0 - 2026-05-12
 

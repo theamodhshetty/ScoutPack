@@ -1,0 +1,41 @@
+name: Bug report
+description: Report a reproducible ScoutPack bug.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What happened?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction
+      description: Commands, fixture, or minimal repo shape needed to reproduce.
+      value: |
+        ```bash
+        scoutpack pack .
+        scoutpack context "..."
+        ```
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      value: |
+        - OS:
+        - Rust:
+        - ScoutPack version:
+    validations:
+      required: true
+
