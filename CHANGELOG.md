@@ -4,6 +4,10 @@ All notable ScoutPack changes are tracked here.
 
 ## Unreleased
 
+No unreleased changes yet.
+
+## v0.1.0 - 2026-05-12
+
 ### Added
 
 - Rust CLI with `init`, `pack`, `search`, `context`, and `stats`.
@@ -22,4 +26,3 @@ All notable ScoutPack changes are tracked here.
 
 - Sensitive file patterns are skipped by default.
 - No telemetry, cloud calls, API keys, auto-edits, or project command execution.
-
