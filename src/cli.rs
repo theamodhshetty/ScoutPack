@@ -60,4 +60,10 @@ pub enum Commands {
         #[arg(long, default_value_t = false)]
         json: bool,
     },
+
+    /// Start a read-only MCP server over an existing ScoutPack index.
+    Mcp {
+        #[arg(default_value = ".")]
+        path: PathBuf,
+    },
 }

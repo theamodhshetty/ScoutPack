@@ -1,4 +1,9 @@
-use std::{fs, path::Path, process::Command};
+use std::{
+    fs,
+    io::Write,
+    path::Path,
+    process::{Command, Stdio},
+};
 
 fn bin() -> &'static str {
     env!("CARGO_BIN_EXE_scoutpack")
@@ -212,4 +217,70 @@ fn init_pack_search_context_stats_work() {
     );
     let stats_json_value: serde_json::Value = serde_json::from_slice(&stats_json.stdout).unwrap();
     assert!(stats_json_value["file_count"].as_i64().unwrap() > 0);
+
+    let mut mcp = Command::new(bin())
+        .args(["mcp", "."])
+        .current_dir(temp.path())
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    {
+        let stdin = mcp.stdin.as_mut().unwrap();
+        writeln!(
+            stdin,
+            r#"{{"jsonrpc":"2.0","id":1,"method":"initialize","params":{{"protocolVersion":"2025-11-25","capabilities":{{}},"clientInfo":{{"name":"integration-test","version":"0.0.0"}}}}}}"#
+        )
+        .unwrap();
+        writeln!(
+            stdin,
+            r#"{{"jsonrpc":"2.0","method":"notifications/initialized","params":{{}}}}"#
+        )
+        .unwrap();
+        writeln!(
+            stdin,
+            r#"{{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{{}}}}"#
+        )
+        .unwrap();
+        writeln!(
+            stdin,
+            r#"{{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{{"name":"stats","arguments":{{}}}}}}"#
+        )
+        .unwrap();
+        writeln!(
+            stdin,
+            r#"{{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{{"name":"search","arguments":{{"query":"auth middleware","limit":3}}}}}}"#
+        )
+        .unwrap();
+    }
+    drop(mcp.stdin.take());
+    let mcp_output = mcp.wait_with_output().unwrap();
+    assert!(
+        mcp_output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&mcp_output.stderr)
+    );
+    let mcp_stdout = String::from_utf8_lossy(&mcp_output.stdout);
+    let messages: Vec<serde_json::Value> = mcp_stdout
+        .lines()
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect();
+    let tools = messages.iter().find(|message| message["id"] == 2).unwrap()["result"]["tools"]
+        .as_array()
+        .unwrap();
+    assert!(tools.iter().any(|tool| tool["name"] == "context"));
+    assert!(tools.iter().any(|tool| tool["name"] == "file_summary"));
+    let mcp_stats = messages.iter().find(|message| message["id"] == 3).unwrap()["result"]
+        ["structuredContent"]
+        .clone();
+    assert!(mcp_stats["file_count"].as_i64().unwrap() > 0);
+    let mcp_search = messages.iter().find(|message| message["id"] == 4).unwrap()["result"]
+        ["structuredContent"]
+        .clone();
+    assert!(mcp_search["results"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|result| result["path"] == "src/middleware/auth.ts"));
 }

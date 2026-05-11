@@ -50,6 +50,49 @@ pub struct IndexStats {
     pub index_path: PathBuf,
 }
 
+#[derive(Debug, Serialize)]
+pub struct IndexedCommand {
+    pub name: String,
+    pub command: String,
+    pub source: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct FileChunkSummary {
+    pub kind: String,
+    pub name: Option<String>,
+    pub start_line: usize,
+    pub end_line: usize,
+}
+
+#[derive(Debug, Serialize)]
+pub struct IndexedSymbol {
+    pub name: String,
+    pub kind: String,
+    pub start_line: usize,
+    pub end_line: usize,
+}
+
+#[derive(Debug, Serialize)]
+pub struct FileSummary {
+    pub path: String,
+    pub language: String,
+    pub kind: String,
+    pub size_bytes: usize,
+    pub indexed_at: i64,
+    pub symbols: Vec<IndexedSymbol>,
+    pub chunks: Vec<FileChunkSummary>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct SymbolMatch {
+    pub path: String,
+    pub name: String,
+    pub kind: String,
+    pub start_line: usize,
+    pub end_line: usize,
+}
+
 pub fn index_path(root: &Path) -> PathBuf {
     root.join(INDEX_DIR).join(DB_FILE)
 }
@@ -191,6 +234,118 @@ pub fn read_commands(conn: &Connection) -> Result<Vec<(String, String, String)>>
          END, name",
     )?;
     let rows = stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))?;
+    rows.collect::<rusqlite::Result<Vec<_>>>()
+        .map_err(Into::into)
+}
+
+pub fn read_indexed_commands(conn: &Connection) -> Result<Vec<IndexedCommand>> {
+    Ok(read_commands(conn)?
+        .into_iter()
+        .map(|(name, command, source)| IndexedCommand {
+            name,
+            command,
+            source,
+        })
+        .collect())
+}
+
+pub fn read_file_summary(conn: &Connection, path: &str) -> Result<Option<FileSummary>> {
+    let path = path.strip_prefix("./").unwrap_or(path);
+    let file = conn
+        .query_row(
+            "SELECT id, path, language, kind, size_bytes, indexed_at
+             FROM files
+             WHERE path = ?1",
+            params![path],
+            |row| {
+                Ok((
+                    row.get::<_, i64>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, i64>(4)?,
+                    row.get::<_, i64>(5)?,
+                ))
+            },
+        )
+        .optional()?;
+
+    let Some((file_id, path, language, kind, size_bytes, indexed_at)) = file else {
+        return Ok(None);
+    };
+
+    let mut symbol_stmt = conn.prepare(
+        "SELECT name, kind, start_line, end_line
+         FROM symbols
+         WHERE file_id = ?1
+         ORDER BY start_line, name",
+    )?;
+    let symbol_rows = symbol_stmt.query_map(params![file_id], |row| {
+        Ok(IndexedSymbol {
+            name: row.get(0)?,
+            kind: row.get(1)?,
+            start_line: row.get::<_, i64>(2)? as usize,
+            end_line: row.get::<_, i64>(3)? as usize,
+        })
+    })?;
+    let symbols = symbol_rows.collect::<rusqlite::Result<Vec<_>>>()?;
+
+    let mut chunk_stmt = conn.prepare(
+        "SELECT kind, name, start_line, end_line
+         FROM chunks
+         WHERE file_id = ?1
+         ORDER BY start_line
+         LIMIT 50",
+    )?;
+    let chunk_rows = chunk_stmt.query_map(params![file_id], |row| {
+        Ok(FileChunkSummary {
+            kind: row.get(0)?,
+            name: row.get(1)?,
+            start_line: row.get::<_, i64>(2)? as usize,
+            end_line: row.get::<_, i64>(3)? as usize,
+        })
+    })?;
+    let chunks = chunk_rows.collect::<rusqlite::Result<Vec<_>>>()?;
+
+    Ok(Some(FileSummary {
+        path,
+        language,
+        kind,
+        size_bytes: size_bytes as usize,
+        indexed_at,
+        symbols,
+        chunks,
+    }))
+}
+
+pub fn find_symbols(conn: &Connection, query: &str, limit: usize) -> Result<Vec<SymbolMatch>> {
+    if query.trim().is_empty() || limit == 0 {
+        return Ok(Vec::new());
+    }
+    let like = format!("%{}%", query.trim().to_ascii_lowercase());
+    let mut stmt = conn.prepare(
+        "SELECT f.path, s.name, s.kind, s.start_line, s.end_line
+         FROM symbols s
+         JOIN files f ON s.file_id = f.id
+         WHERE lower(s.name) LIKE ?1
+         ORDER BY
+           CASE WHEN lower(s.name) = ?2 THEN 0 ELSE 1 END,
+           f.path,
+           s.start_line
+         LIMIT ?3",
+    )?;
+    let rows = stmt.query_map(
+        params![like, query.trim().to_ascii_lowercase(), limit as i64],
+        |row| {
+            Ok(SymbolMatch {
+                path: row.get(0)?,
+                name: row.get(1)?,
+                kind: row.get(2)?,
+                start_line: row.get::<_, i64>(3)? as usize,
+                end_line: row.get::<_, i64>(4)? as usize,
+            })
+        },
+    )?;
     rows.collect::<rusqlite::Result<Vec<_>>>()
         .map_err(Into::into)
 }

@@ -7,6 +7,7 @@ All notable ScoutPack changes are tracked here.
 ### Added
 
 - Machine-readable JSON output for `search`, `context`, and `stats`.
+- Read-only MCP server with `search`, `context`, `file_summary`, `symbol`, `commands`, and `stats` tools.
 - Discoverability docs for AI agent workflows, use cases, and FAQ.
 - GitHub issue templates and pull request template.
 

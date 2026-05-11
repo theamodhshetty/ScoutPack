@@ -4,6 +4,7 @@ mod config;
 mod context;
 mod git;
 mod index;
+mod mcp;
 mod output;
 mod scanner;
 mod search;
@@ -13,7 +14,8 @@ use anyhow::Result;
 use clap::Parser;
 use cli::{Cli, Commands};
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     let cli = Cli::parse();
     init_tracing(cli.verbose);
 
@@ -63,6 +65,9 @@ fn main() -> Result<()> {
                 output::print_stats(&stats);
             }
         }
+        Commands::Mcp { path } => {
+            mcp::serve(path).await?;
+        }
     }
 
     Ok(())
@@ -76,6 +81,7 @@ fn init_tracing(verbose: u8) {
     };
     let _ = tracing_subscriber::fmt()
         .with_env_filter(level)
+        .with_writer(std::io::stderr)
         .without_time()
         .try_init();
 }

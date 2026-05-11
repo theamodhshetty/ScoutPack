@@ -193,7 +193,13 @@ scoutpack stats --json
 
 Returns index stats and manifest data as JSON.
 
-## Supported In v0.1
+```bash
+scoutpack mcp .
+```
+
+Starts a read-only MCP server over the existing local index. Tools include `search`, `context`, `file_summary`, `symbol`, `commands`, and `stats`.
+
+## Supported Today
 
 | Area | Support |
 | --- | --- |
@@ -203,11 +209,11 @@ Returns index stats and manifest data as JSON.
 | YAML / TOML | config chunks |
 | Search | SQLite FTS5 plus deterministic ranking |
 | Context | markdown packets with budget-aware snippets |
+| MCP | read-only stdio server for agent clients |
 | Privacy | local-only index, sensitive file skips |
 
 ## Not In Scope Yet
 
-- MCP server
 - embeddings or vector search
 - cloud sync
 - GUI
@@ -230,6 +236,7 @@ Security details: [SECURITY.md](SECURITY.md).
 ## Docs
 
 - [Installation](docs/installation.md)
+- [MCP server](docs/mcp.md)
 - [AI agent workflows](docs/ai-agent-workflows.md)
 - [Use cases](docs/use-cases.md)
 - [FAQ](docs/faq.md)

@@ -48,5 +48,15 @@ scoutpack context "fix login redirect loop" --budget 2500 --json
 scoutpack stats --json
 ```
 
-This is useful for scripts, wrappers, and future MCP integration.
+This is useful for scripts, wrappers, and clients that prefer direct JSON output.
 
+## MCP Clients
+
+For clients that support MCP, run ScoutPack as a read-only stdio server over an existing index:
+
+```bash
+scoutpack pack .
+scoutpack mcp .
+```
+
+The MCP server exposes `search`, `context`, `file_summary`, `symbol`, `commands`, and `stats`. See [MCP server](mcp.md).

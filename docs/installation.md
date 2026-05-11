@@ -81,4 +81,13 @@ scoutpack context "fix login redirect loop" --budget 2500 --json
 scoutpack stats --json
 ```
 
-Use JSON output when building wrappers, scripts, or MCP clients.
+Use JSON output when building wrappers and scripts.
+
+For MCP clients:
+
+```bash
+scoutpack pack .
+scoutpack mcp .
+```
+
+See [MCP server](mcp.md) for client configuration.

@@ -26,9 +26,8 @@ v0.1 is strongest for TypeScript, TSX, Next.js-style repos, Markdown, JSON, YAML
 
 ## Why not build MCP first?
 
-CLI output must be useful before MCP is worth exposing. `--json` output now gives scripts and agents a stable bridge while MCP is being built.
+The CLI came first so the context output could stand on its own. ScoutPack now also includes a read-only MCP server for clients that can call tools directly.
 
 ## What files are skipped?
 
 ScoutPack skips binary files, oversized files, ignored directories, and common sensitive patterns such as `.env`, `.env.*`, private keys, certificates, and provisioning profiles.
-
