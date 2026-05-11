@@ -166,11 +166,12 @@ fn chunk_typescript(path: &str, text: &str) -> ChunkedFile {
     let mut symbols = Vec::new();
 
     for (idx, line) in lines.iter().enumerate() {
-        let trimmed = line.trim();
+        let raw_line = *line;
+        let trimmed = raw_line.trim();
         if let Some(import) = parse_import(trimmed) {
             imports.push(import);
         }
-        if let Some((kind, name)) = parse_symbol(trimmed, path) {
+        if let Some((kind, name)) = parse_symbol(raw_line, path) {
             symbols.push(Symbol {
                 name,
                 kind,
@@ -292,7 +293,14 @@ fn parse_import(line: &str) -> Option<Import> {
 }
 
 fn parse_symbol(line: &str, path: &str) -> Option<(String, String)> {
-    let mut text = line
+    let original = line;
+    let is_top_level = !original.starts_with(' ') && !original.starts_with('\t');
+    if !is_top_level {
+        return None;
+    }
+
+    let mut text = original
+        .trim()
         .trim_start_matches("export ")
         .trim_start_matches("default ")
         .trim();
@@ -404,5 +412,14 @@ mod tests {
         assert_eq!(chunked.imports.len(), 1);
         assert_eq!(chunked.symbols[0].name, "LoginPage");
         assert_eq!(chunked.symbols[0].kind, "component");
+    }
+
+    #[test]
+    fn typescript_ignores_local_variables_as_symbols() {
+        let text = "export function requireAuth() {\n  const session = getSession();\n  const url = new URL('/');\n}\n";
+        let chunked = chunk_file("src/middleware/auth.ts", "typescript", text);
+        assert_eq!(chunked.symbols.len(), 1);
+        assert_eq!(chunked.symbols[0].name, "requireAuth");
+        assert_eq!(chunked.chunks[0].end_line, 4);
     }
 }
