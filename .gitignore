@@ -1,0 +1,17 @@
+/target/
+/.scoutpack/
+/.DS_Store
+
+# Local planning prompts and private notes.
+/SCOUTPACK_BUILD_PROMPT.md
+/*_BUILD_PROMPT.md
+/*.prompt.md
+/.env
+/.env.*
+*.pem
+*.key
+id_rsa
+id_ed25519
+*.p12
+*.mobileprovision
+

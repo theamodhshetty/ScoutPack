@@ -1,0 +1,17 @@
+{
+  "scripts": {
+    "test": "vitest",
+    "lint": "eslint .",
+    "build": "next build"
+  },
+  "dependencies": {
+    "next": "15.0.0",
+    "react": "19.0.0",
+    "react-dom": "19.0.0"
+  },
+  "devDependencies": {
+    "vitest": "2.0.0",
+    "eslint": "9.0.0"
+  }
+}
+
