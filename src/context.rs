@@ -1,6 +1,6 @@
 use crate::{index, search, token_budget};
 use anyhow::Result;
-use std::{collections::BTreeMap, path::Path};
+use std::path::Path;
 
 pub fn build_context_packet(
     root: impl AsRef<Path>,
@@ -15,53 +15,53 @@ pub fn build_context_packet(
     let commands = index::read_commands(&conn)?;
     let frameworks = index::framework_signals(&conn)?;
 
-    let mut packet = String::new();
-    packet.push_str("# ScoutPack Context\n\n");
-    packet.push_str("Task:\n");
-    packet.push_str(task);
-    packet.push_str("\n\n");
+    let mut prefix = String::new();
+    prefix.push_str("# ScoutPack Context\n\n");
+    prefix.push_str("Task:\n");
+    prefix.push_str(task);
+    prefix.push_str("\n\n");
 
     if budget < 600 {
-        packet.push_str("Warning: budget too small for snippets. Returning file list only.\n\n");
+        prefix.push_str("Warning: budget too small for snippets. Returning file list only.\n\n");
     }
 
-    packet.push_str("Relevant Files:\n");
+    prefix.push_str("Relevant Files:\n");
     let files = relevant_files(&results);
     if files.is_empty() {
-        packet.push_str("- Unknown from index\n");
+        prefix.push_str("- Unknown from index\n");
     } else {
-        for (path, reason) in &files {
-            packet.push_str(&format!("- `{path}`: {reason}\n"));
+        for (path, reason) in files {
+            prefix.push_str(&format!("- `{path}`: {reason}\n"));
         }
     }
 
-    packet.push_str("\nCurrent Repo Signals:\n");
+    prefix.push_str("\nCurrent Repo Signals:\n");
     if frameworks.is_empty() {
-        packet.push_str("- Framework: Unknown from index\n");
+        prefix.push_str("- Framework: Unknown from index\n");
     } else {
-        packet.push_str(&format!("- Framework: {}\n", frameworks.join(", ")));
+        prefix.push_str(&format!("- Framework: {}\n", frameworks.join(", ")));
     }
     for (name, command, _) in commands
         .iter()
         .filter(|(name, _, _)| matches!(name.as_str(), "test" | "lint" | "typecheck" | "build"))
     {
-        packet.push_str(&format!("- {name} command: `{command}`\n"));
+        prefix.push_str(&format!("- {name} command: `{command}`\n"));
     }
 
-    packet.push_str("\nLikely Edit Areas:\n");
+    prefix.push_str("\nLikely Edit Areas:\n");
     let edit_areas = likely_edit_areas(task, &results);
     if edit_areas.is_empty() {
-        packet.push_str("- Unknown from index\n");
+        prefix.push_str("- Unknown from index\n");
     } else {
         for area in edit_areas {
-            packet.push_str(&format!("- {area}\n"));
+            prefix.push_str(&format!("- {area}\n"));
         }
     }
 
-    let mut with_snippets = packet.clone();
-    with_snippets.push_str("\nRelevant Snippets:\n");
+    let suffix = required_tail(&commands, task);
+    let mut snippet_section = String::from("\nRelevant Snippets:\n");
     if results.is_empty() || budget < 600 {
-        with_snippets.push_str("- Unknown from index\n");
+        snippet_section.push_str("- Unknown from index\n");
     } else {
         let mut added = 0usize;
         for result in &results {
@@ -72,57 +72,71 @@ pub fn build_context_packet(
                 "\n```file:{}:{}-{}\n{}\n```\n",
                 result.path, result.start_line, result.end_line, text
             );
-            let candidate = format!("{with_snippets}{block}");
+            let candidate = format!("{prefix}{snippet_section}{block}{suffix}");
             if token_budget::estimate_tokens(&candidate) <= budget + (budget / 10) {
-                with_snippets.push_str(&block);
+                snippet_section.push_str(&block);
                 added += 1;
             }
         }
         if added == 0 {
-            with_snippets.push_str("- Budget exhausted before snippets.\n");
+            snippet_section.push_str("- Budget exhausted before snippets.\n");
         }
     }
 
-    with_snippets.push_str("\nCommands:\n");
+    let with_snippets = format!("{prefix}{snippet_section}{suffix}");
+    if token_budget::fits(&with_snippets, budget + (budget / 10)) {
+        Ok(with_snippets)
+    } else {
+        Ok(format!(
+            "{prefix}\nRelevant Snippets:\n- Budget exhausted before snippets.\n{suffix}"
+        ))
+    }
+}
+
+fn required_tail(commands: &[(String, String, String)], task: &str) -> String {
+    let mut tail = String::new();
+    tail.push_str("\nCommands:\n");
     let relevant_commands: Vec<_> = commands
         .iter()
         .filter(|(name, _, _)| matches!(name.as_str(), "test" | "lint" | "typecheck" | "build"))
         .collect();
     if relevant_commands.is_empty() {
-        with_snippets.push_str("- Unknown from index\n");
+        tail.push_str("- Unknown from index\n");
     } else {
         for (_, command, _) in relevant_commands {
-            with_snippets.push_str(&format!("- `{command}`\n"));
+            tail.push_str(&format!("- `{command}`\n"));
         }
     }
 
-    with_snippets.push_str("\nRisks:\n");
+    tail.push_str("\nRisks:\n");
     let risks = risk_hints(task);
     if risks.is_empty() {
-        with_snippets.push_str("- Unknown from index\n");
+        tail.push_str("- Unknown from index\n");
     } else {
         for risk in risks {
-            with_snippets.push_str(&format!("- {risk}\n"));
+            tail.push_str(&format!("- {risk}\n"));
         }
     }
-
-    if token_budget::fits(&with_snippets, budget + (budget / 10)) {
-        Ok(with_snippets)
-    } else {
-        Ok(packet)
-    }
+    tail
 }
 
-fn relevant_files(results: &[search::SearchResult]) -> BTreeMap<String, String> {
-    let mut files = BTreeMap::new();
+fn relevant_files(results: &[search::SearchResult]) -> Vec<(String, String)> {
+    let mut files = Vec::new();
     for result in results {
-        files.entry(result.path.clone()).or_insert_with(|| {
+        if files
+            .iter()
+            .any(|(path, _): &(String, String)| path == &result.path)
+        {
+            continue;
+        }
+        let reason = {
             if let Some(name) = &result.name {
                 format!("{} `{name}`", result.kind)
             } else {
                 result.reason.clone()
             }
-        });
+        };
+        files.push((result.path.clone(), reason));
     }
     files
 }

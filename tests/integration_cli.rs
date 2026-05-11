@@ -114,6 +114,25 @@ fn init_pack_search_context_stats_work() {
     );
     assert!(context_out.contains("vitest"), "{context_out}");
 
+    let tiny_context = Command::new(bin())
+        .args(["context", "fix login redirect loop", "--budget", "300"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        tiny_context.status.success(),
+        "{}",
+        String::from_utf8_lossy(&tiny_context.stderr)
+    );
+    let tiny_context_out = String::from_utf8_lossy(&tiny_context.stdout);
+    assert!(tiny_context_out.contains("Commands:"), "{tiny_context_out}");
+    assert!(tiny_context_out.contains("Risks:"), "{tiny_context_out}");
+    assert!(
+        tiny_context_out.contains("Budget exhausted")
+            || tiny_context_out.contains("Unknown from index"),
+        "{tiny_context_out}"
+    );
+
     let stats = Command::new(bin())
         .arg("stats")
         .current_dir(temp.path())

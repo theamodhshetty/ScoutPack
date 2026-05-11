@@ -56,10 +56,11 @@ ScoutPack development stays milestone-driven. Each major milestone should end wi
 
 ### M7: Context Quality
 
-- better task-term ranking
-- import proximity boost
-- risk hints grounded by indexed evidence
-- tighter token budgeting
+- preserve required Commands and Risks sections under tight budgets
+- keep relevant files in ranking order
+- improve task-term ranking
+- add import proximity boost
+- ground risk hints with indexed evidence
 
 ### M8: Public Release Prep
 
