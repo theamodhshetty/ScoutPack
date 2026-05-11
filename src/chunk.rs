@@ -1,4 +1,6 @@
 use serde_json::Value;
+use tree_sitter::{Node, Parser};
+
 #[derive(Debug, Clone)]
 pub struct Chunk {
     pub kind: String,
@@ -161,6 +163,82 @@ fn chunk_json(path: &str, text: &str) -> ChunkedFile {
 }
 
 fn chunk_typescript(path: &str, text: &str) -> ChunkedFile {
+    chunk_typescript_tree_sitter(path, text)
+        .unwrap_or_else(|| chunk_typescript_heuristic(path, text))
+}
+
+fn chunk_typescript_tree_sitter(path: &str, text: &str) -> Option<ChunkedFile> {
+    let mut parser = Parser::new();
+    let language = if path.ends_with(".tsx") {
+        tree_sitter_typescript::LANGUAGE_TSX
+    } else {
+        tree_sitter_typescript::LANGUAGE_TYPESCRIPT
+    };
+    parser.set_language(&language.into()).ok()?;
+    let tree = parser.parse(text, None)?;
+    let root = tree.root_node();
+    if root.has_error() {
+        return None;
+    }
+
+    let mut imports = Vec::new();
+    let mut symbols = Vec::new();
+    let mut chunks = Vec::new();
+    let mut cursor = root.walk();
+
+    for node in root.named_children(&mut cursor) {
+        if node.kind() == "import_statement" {
+            if let Some(import) = import_from_node(node, text) {
+                imports.push(import);
+            }
+            continue;
+        }
+
+        let Some((chunk_node, declaration_node, kind, name)) =
+            declaration_from_node(node, path, text)
+        else {
+            continue;
+        };
+        let start_line = chunk_node.start_position().row + 1;
+        let end_line = chunk_node.end_position().row + 1;
+        symbols.push(Symbol {
+            name: name.clone(),
+            kind: kind.clone(),
+            start_line,
+            end_line,
+        });
+        chunks.push(Chunk {
+            kind,
+            name: Some(name),
+            start_line,
+            end_line,
+            text: node_text(chunk_node, text),
+        });
+
+        if declaration_node.kind() == "lexical_declaration"
+            || declaration_node.kind() == "variable_statement"
+        {
+            continue;
+        }
+    }
+
+    if symbols.is_empty() {
+        return Some(ChunkedFile {
+            chunks: fallback_line_windows(path, text, 80),
+            imports,
+            ..ChunkedFile::default()
+        });
+    }
+
+    Some(ChunkedFile {
+        chunks,
+        symbols,
+        imports,
+        ..ChunkedFile::default()
+    })
+}
+
+fn chunk_typescript_heuristic(path: &str, text: &str) -> ChunkedFile {
     let lines: Vec<&str> = text.lines().collect();
     let mut imports = Vec::new();
     let mut symbols = Vec::new();
@@ -213,6 +291,106 @@ fn chunk_typescript(path: &str, text: &str) -> ChunkedFile {
         imports,
         ..ChunkedFile::default()
     }
+}
+
+fn import_from_node(node: Node<'_>, text: &str) -> Option<Import> {
+    let string_node = find_descendant_by_kind(node, "string")?;
+    let to_path = node_text(string_node, text)
+        .trim()
+        .trim_matches('"')
+        .trim_matches('\'')
+        .to_owned();
+    if to_path.is_empty() {
+        None
+    } else {
+        Some(Import {
+            to_path,
+            symbol: None,
+        })
+    }
+}
+
+fn declaration_from_node<'a>(
+    node: Node<'a>,
+    path: &str,
+    text: &str,
+) -> Option<(Node<'a>, Node<'a>, String, String)> {
+    let declaration = if node.kind() == "export_statement" {
+        node.child_by_field_name("declaration")
+            .or_else(|| first_declaration_child(node))?
+    } else {
+        node
+    };
+
+    let name = declaration_name(declaration, text)?;
+    let kind = declaration_kind(path, declaration.kind(), &name)?;
+    Some((node, declaration, kind, name))
+}
+
+fn first_declaration_child(node: Node<'_>) -> Option<Node<'_>> {
+    let mut cursor = node.walk();
+    let declaration = node
+        .named_children(&mut cursor)
+        .find(|child| declaration_kind("", child.kind(), "x").is_some());
+    declaration
+}
+
+fn declaration_name(node: Node<'_>, text: &str) -> Option<String> {
+    if matches!(
+        node.kind(),
+        "lexical_declaration" | "variable_statement" | "variable_declaration"
+    ) {
+        let declarator = find_descendant_by_kind(node, "variable_declarator")?;
+        let name = declarator.child_by_field_name("name")?;
+        return Some(node_text(name, text));
+    }
+
+    node.child_by_field_name("name")
+        .map(|name| node_text(name, text))
+}
+
+fn declaration_kind(path: &str, node_kind: &str, name: &str) -> Option<String> {
+    let base_kind = match node_kind {
+        "function_declaration" | "generator_function_declaration" => "function",
+        "class_declaration" => "class",
+        "interface_declaration" => "interface",
+        "type_alias_declaration" => "type",
+        "lexical_declaration" | "variable_statement" | "variable_declaration" => "value",
+        _ => return None,
+    };
+
+    let kind = if (path.ends_with("route.ts") || path.ends_with("route.tsx"))
+        && ["GET", "POST", "PUT", "PATCH", "DELETE"].contains(&name)
+    {
+        "route-handler"
+    } else if name
+        .chars()
+        .next()
+        .is_some_and(|ch| ch.is_ascii_uppercase())
+        && matches!(base_kind, "function" | "value")
+    {
+        "component"
+    } else {
+        base_kind
+    };
+    Some(kind.to_owned())
+}
+
+fn find_descendant_by_kind<'a>(node: Node<'a>, kind: &str) -> Option<Node<'a>> {
+    let mut cursor = node.walk();
+    for child in node.named_children(&mut cursor) {
+        if child.kind() == kind {
+            return Some(child);
+        }
+        if let Some(found) = find_descendant_by_kind(child, kind) {
+            return Some(found);
+        }
+    }
+    None
+}
+
+fn node_text(node: Node<'_>, text: &str) -> String {
+    text.get(node.byte_range()).unwrap_or_default().to_owned()
 }
 
 fn chunk_config(path: &str, text: &str) -> ChunkedFile {
@@ -421,5 +599,27 @@ mod tests {
         assert_eq!(chunked.symbols.len(), 1);
         assert_eq!(chunked.symbols[0].name, "requireAuth");
         assert_eq!(chunked.chunks[0].end_line, 4);
+    }
+
+    #[test]
+    fn typescript_extracts_exported_types_and_const_components() {
+        let text = "export interface User { id: string }\nexport type Mode = 'dark' | 'light';\nexport const SettingsPanel = () => <div />;\n";
+        let chunked = chunk_file("src/settings.tsx", "typescript", text);
+        let names: Vec<_> = chunked
+            .symbols
+            .iter()
+            .map(|symbol| (symbol.kind.as_str(), symbol.name.as_str()))
+            .collect();
+        assert!(names.contains(&("interface", "User")));
+        assert!(names.contains(&("type", "Mode")));
+        assert!(names.contains(&("component", "SettingsPanel")));
+    }
+
+    #[test]
+    fn typescript_extracts_route_handlers() {
+        let text = "export async function GET() {\n  return Response.json({ ok: true });\n}\n";
+        let chunked = chunk_file("src/app/api/health/route.ts", "typescript", text);
+        assert_eq!(chunked.symbols[0].name, "GET");
+        assert_eq!(chunked.symbols[0].kind, "route-handler");
     }
 }

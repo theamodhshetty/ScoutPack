@@ -39,8 +39,6 @@ ScoutPack development stays milestone-driven. Each major milestone should end wi
 - package script and framework signals
 - fixture integration test
 
-## Next
-
 ### M5: Incremental Indexing
 
 - reuse unchanged files on repeated `pack`
@@ -50,8 +48,11 @@ ScoutPack development stays milestone-driven. Each major milestone should end wi
 ### M6: Parser Quality
 
 - tree-sitter TypeScript and TSX symbol extraction
-- imports with source symbols
-- route and component detection with fewer false positives
+- route handler detection
+- exported type/interface and const component extraction
+- heuristic parser fallback for parse errors
+
+## Next
 
 ### M7: Context Quality
 
@@ -72,4 +73,3 @@ ScoutPack development stays milestone-driven. Each major milestone should end wi
 - read-only MCP server
 - `search`, `context`, `file_summary`, `symbol`, `commands`, `stats`
 - no write, network, or shell execution capabilities
-
