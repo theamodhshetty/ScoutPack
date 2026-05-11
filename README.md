@@ -1,61 +1,102 @@
-# ScoutPack
+<p align="center">
+  <img src="assets/scoutpack-logo.svg" width="720" alt="ScoutPack logo">
+</p>
 
-[![CI](https://github.com/theamodhshetty/ScoutPack/actions/workflows/ci.yml/badge.svg)](https://github.com/theamodhshetty/ScoutPack/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+<p align="center">
+  <strong>Offline repo context compiler for AI coding agents.</strong>
+</p>
 
-Offline repo context for AI agents.
+<p align="center">
+  Build a local searchable index, then hand Codex, Claude Code, Cursor, Aider, and other agents only the files, symbols, snippets, commands, and risks that matter.
+</p>
 
-ScoutPack is an offline repo context compiler for AI coding agents. It scans a local project, builds a searchable SQLite index, and returns compact task-specific context packets for Codex, Claude Code, Cursor, Aider, and similar tools.
+<p align="center">
+  <a href="https://github.com/theamodhshetty/ScoutPack/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/theamodhshetty/ScoutPack/ci.yml?branch=main&label=CI"></a>
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-2563eb"></a>
+  <a href="Cargo.toml"><img alt="Rust" src="https://img.shields.io/badge/Rust-CLI-f97316"></a>
+  <a href="docs/mcp.md"><img alt="MCP" src="https://img.shields.io/badge/MCP-read--only-14b8a6"></a>
+  <img alt="Local first" src="https://img.shields.io/badge/local--first-no%20cloud-0f172a">
+</p>
 
-Use it when an AI coding assistant needs to know which files, symbols, snippets, commands, and risks matter before it starts editing.
+<p align="center">
+  <a href="#quick-start">Quick Start</a> ·
+  <a href="#demo">Demo</a> ·
+  <a href="#mcp-server">MCP</a> ·
+  <a href="#commands">Commands</a> ·
+  <a href="docs/installation.md">Install</a> ·
+  <a href="docs/milestones.md">Roadmap</a>
+</p>
+
+---
+
+## Why ScoutPack
+
+AI coding agents are powerful, but they still burn time and tokens when they start with the wrong repo context.
+
+| Without ScoutPack | With ScoutPack |
+| --- | --- |
+| Agent scans broad folders. | Agent starts with ranked files and symbols. |
+| Repo conventions get missed. | Package scripts and framework signals are included. |
+| Secret files are risky. | Sensitive patterns are skipped by default. |
+| Context grows into noise. | Packets stay under a token budget. |
+| Debugging starts from guesses. | Risks include source-backed evidence. |
+
+ScoutPack answers one practical question before edits start:
+
+```txt
+What should this AI agent read first for this task?
+```
+
+## One-Minute Flow
 
 ```bash
+cargo install --git https://github.com/theamodhshetty/ScoutPack.git
+
+cd your-project
+scoutpack init
 scoutpack pack .
 scoutpack context "fix login redirect loop" --budget 2500
 ```
 
-No cloud. No API key. No telemetry. No auto-edits. No project command execution.
+Output is local, compact, and agent-ready:
 
-## Also Known As
+```md
+# ScoutPack Context
 
-People may describe this problem as:
+Task:
+fix login redirect loop
 
-- AI coding agent context
-- local codebase search for AI
-- offline repo indexing
-- context engineering for code
-- local-first RAG alternative for private repos
-- token-budgeted code context
-- repo map for AI assistants
+Relevant Files:
+- `src/app/login/page.tsx`: component `LoginPage`
+- `src/lib/session.ts`: function `getSession`
+- `src/middleware/auth.ts`: function `requireAuth`
 
-## Why ScoutPack
+Current Repo Signals:
+- Framework: Next.js, React, Vitest
+- test command: `vitest`
+- build command: `next build`
 
-AI coding agents waste tokens when they:
-
-- read broad or wrong files
-- miss repo conventions
-- ignore package scripts
-- re-read the same context across turns
-- over-index docs when source files matter more
-
-ScoutPack solves the upstream problem: context selection. For a task, it answers:
-
-```txt
-What files, symbols, snippets, commands, and risks should an AI agent know first?
+Risks:
+- redirect loop if post-login destination points back to login or auth guard
+  (source: `src/middleware/auth.ts:3-14`)
 ```
 
-## Current Status
+No cloud. No API key. No telemetry. No auto-edits. No project command execution.
 
-ScoutPack is early v0.1 software, but the core CLI works:
+## What You Get
 
-- local repo scan with `.gitignore` and `.scoutpackignore`
-- SQLite + FTS5 index in `.scoutpack/`
-- incremental re-indexing for unchanged files
-- TypeScript/TSX parsing with tree-sitter
-- Markdown, JSON, YAML, and TOML support
-- package.json script and framework detection
-- token-budgeted markdown context packets
-- grounded risk hints with source ranges
+| Feature | What it does |
+| --- | --- |
+| Local index | SQLite + FTS5 index in `.scoutpack/` |
+| Smart scan | Respects `.gitignore`, `.scoutpackignore`, binary limits, and sensitive skips |
+| Code structure | TypeScript/TSX symbols, route handlers, imports, Markdown sections, config chunks |
+| Task context | Token-budgeted packet with relevant files, snippets, commands, and risks |
+| MCP server | Read-only `search`, `context`, `file_summary`, `symbol`, `commands`, `stats` tools |
+| Automation output | JSON mode for wrappers and scripts |
+
+## Search Terms
+
+People may look for this as AI coding agent context, local codebase search for AI, offline repo indexing, context engineering for code, local-first RAG alternative, token-budgeted code context, repo map, MCP code search, or private repo context.
 
 ## Install
 
@@ -102,7 +143,7 @@ ScoutPack writes local-only data:
   repo-map.md
 ```
 
-## Example
+## Demo
 
 Search:
 
@@ -142,6 +183,34 @@ Risks:
 ```
 
 Full sample: [examples/context.md](examples/context.md).
+
+## MCP Server
+
+Use ScoutPack directly from MCP-aware agent clients:
+
+```json
+{
+  "mcpServers": {
+    "scoutpack": {
+      "command": "scoutpack",
+      "args": ["mcp", "."]
+    }
+  }
+}
+```
+
+Available tools:
+
+| Tool | Returns |
+| --- | --- |
+| `search` | ranked files, symbols, snippets, and reasons |
+| `context` | full task packet with estimated token count |
+| `file_summary` | indexed file metadata, symbols, and chunk ranges |
+| `symbol` | exact or partial symbol matches |
+| `commands` | discovered package scripts without running them |
+| `stats` | index counts and manifest details |
+
+Full setup: [docs/mcp.md](docs/mcp.md).
 
 ## Commands
 

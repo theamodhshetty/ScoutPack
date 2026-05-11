@@ -88,6 +88,13 @@ ScoutPack development stays milestone-driven. Each major milestone should end wi
 - shell completion generation
 - distribution docs
 
+### M10.1: Project Page Polish
+
+- SVG logo and README wordmark
+- sharper README first screen
+- MCP setup surfaced on main page
+- discoverability search terms kept visible
+
 ## Next
 
 ### M11: Index Coverage

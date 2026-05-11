@@ -1,0 +1,57 @@
+<svg width="920" height="260" viewBox="0 0 920 260" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">ScoutPack</title>
+  <desc id="desc">ScoutPack logo, a repo pack with code context signals.</desc>
+  <style>
+    .word { font: 800 70px ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; letter-spacing: 0; }
+    .tag { font: 500 25px ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; letter-spacing: 0; }
+    .small { font: 700 19px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; letter-spacing: 0; }
+    @media (prefers-color-scheme: dark) {
+      .word { fill: #f7fafc; }
+      .tag { fill: #a7b4c8; }
+      .panel { fill: #111827; stroke: #334155; }
+      .line-soft { stroke: #475569; }
+    }
+  </style>
+  <defs>
+    <linearGradient id="pack" x1="88" y1="34" x2="208" y2="223" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#22D3EE"/>
+      <stop offset="0.55" stop-color="#6366F1"/>
+      <stop offset="1" stop-color="#F59E0B"/>
+    </linearGradient>
+    <linearGradient id="signal" x1="38" y1="40" x2="257" y2="214" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#14B8A6"/>
+      <stop offset="1" stop-color="#8B5CF6"/>
+    </linearGradient>
+    <filter id="shadow" x="8" y="8" width="270" height="236" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#0F172A" flood-opacity="0.18"/>
+    </filter>
+  </defs>
+
+  <rect width="920" height="260" rx="34" fill="#F8FAFC"/>
+  <path d="M39 208C145 244 271 227 353 169C450 101 559 68 688 92C774 108 837 143 891 192" stroke="#D9E2F0" stroke-width="2"/>
+  <path d="M68 56C153 23 255 31 336 78C423 128 526 142 617 100C705 60 803 59 887 97" stroke="#E7EEF8" stroke-width="2"/>
+
+  <g filter="url(#shadow)">
+    <path d="M107 69C107 42 128 25 155 25C182 25 203 42 203 69V86H183V70C183 54 173 44 155 44C137 44 127 54 127 70V86H107V69Z" fill="#0F172A"/>
+    <path d="M73 88C73 70.327 87.327 56 105 56H205C222.673 56 237 70.327 237 88V198C237 215.673 222.673 230 205 230H105C87.327 230 73 215.673 73 198V88Z" fill="url(#pack)"/>
+    <path d="M92 102C92 88.745 102.745 78 116 78H194C207.255 78 218 88.745 218 102V196C218 209.255 207.255 220 194 220H116C102.745 220 92 209.255 92 196V102Z" fill="#0F172A" fill-opacity="0.88"/>
+    <path d="M114 124H197" stroke="#38BDF8" stroke-width="8" stroke-linecap="round"/>
+    <path d="M114 152H166" stroke="#A78BFA" stroke-width="8" stroke-linecap="round"/>
+    <path d="M114 180H187" stroke="#FBBF24" stroke-width="8" stroke-linecap="round"/>
+    <path d="M61 113H78V187H61C51.059 187 43 178.941 43 169V131C43 121.059 51.059 113 61 113Z" fill="#111827"/>
+    <path d="M232 113H249C258.941 113 267 121.059 267 131V169C267 178.941 258.941 187 249 187H232V113Z" fill="#111827"/>
+    <circle cx="229" cy="76" r="24" fill="#F8FAFC" stroke="url(#signal)" stroke-width="8"/>
+    <path d="M223 76L229 82L239 67" stroke="#0F172A" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <text class="word" x="309" y="113" fill="#0F172A">ScoutPack</text>
+  <text class="tag" x="314" y="154" fill="#475569">offline repo context for AI coding agents</text>
+  <g transform="translate(315 179)">
+    <rect class="panel" width="412" height="44" rx="12" fill="#FFFFFF" stroke="#CBD5E1"/>
+    <path class="line-soft" d="M23 22H69" stroke="#94A3B8" stroke-width="6" stroke-linecap="round"/>
+    <path d="M92 22H157" stroke="#22D3EE" stroke-width="6" stroke-linecap="round"/>
+    <path d="M181 22H240" stroke="#8B5CF6" stroke-width="6" stroke-linecap="round"/>
+    <path d="M264 22H320" stroke="#F59E0B" stroke-width="6" stroke-linecap="round"/>
+    <text class="small" x="338" y="28" fill="#64748B">.pack</text>
+  </g>
+</svg>
