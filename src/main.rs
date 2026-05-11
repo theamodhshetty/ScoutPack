@@ -11,7 +11,7 @@ mod search;
 mod token_budget;
 
 use anyhow::Result;
-use clap::Parser;
+use clap::{CommandFactory, Parser};
 use cli::{Cli, Commands};
 
 #[tokio::main]
@@ -67,6 +67,11 @@ async fn main() -> Result<()> {
         }
         Commands::Mcp { path } => {
             mcp::serve(path).await?;
+        }
+        Commands::Completions { shell } => {
+            let mut command = Cli::command();
+            let name = command.get_name().to_owned();
+            clap_complete::generate(shell, &mut command, name, &mut std::io::stdout());
         }
     }
 

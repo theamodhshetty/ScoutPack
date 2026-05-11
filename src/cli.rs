@@ -1,4 +1,5 @@
 use clap::{Parser, Subcommand};
+use clap_complete::Shell;
 use std::path::PathBuf;
 
 #[derive(Debug, Parser)]
@@ -65,5 +66,11 @@ pub enum Commands {
     Mcp {
         #[arg(default_value = ".")]
         path: PathBuf,
+    },
+
+    /// Generate shell completion script.
+    Completions {
+        #[arg(value_enum)]
+        shell: Shell,
     },
 }

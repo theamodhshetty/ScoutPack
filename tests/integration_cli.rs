@@ -218,6 +218,20 @@ fn init_pack_search_context_stats_work() {
     let stats_json_value: serde_json::Value = serde_json::from_slice(&stats_json.stdout).unwrap();
     assert!(stats_json_value["file_count"].as_i64().unwrap() > 0);
 
+    let completions = Command::new(bin())
+        .args(["completions", "zsh"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        completions.status.success(),
+        "{}",
+        String::from_utf8_lossy(&completions.stderr)
+    );
+    let completions_out = String::from_utf8_lossy(&completions.stdout);
+    assert!(completions_out.contains("#compdef scoutpack"));
+    assert!(completions_out.contains("completions"));
+
     let mut mcp = Command::new(bin())
         .args(["mcp", "."])
         .current_dir(temp.path())

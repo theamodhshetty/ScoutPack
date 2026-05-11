@@ -8,6 +8,7 @@ All notable ScoutPack changes are tracked here.
 
 - Machine-readable JSON output for `search`, `context`, and `stats`.
 - Read-only MCP server with `search`, `context`, `file_summary`, `symbol`, `commands`, and `stats` tools.
+- Shell completion generation for bash, zsh, fish, PowerShell, and Elvish.
 - Discoverability docs for AI agent workflows, use cases, and FAQ.
 - GitHub issue templates and pull request template.
 

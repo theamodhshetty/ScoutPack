@@ -12,6 +12,7 @@ categories = ["command-line-utilities", "development-tools"]
 [dependencies]
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
+clap_complete = "4"
 hex = "0.4"
 ignore = "0.4"
 rmcp = { version = "1.6.0", features = ["server", "macros", "transport-io", "schemars"] }

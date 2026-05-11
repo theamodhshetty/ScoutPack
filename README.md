@@ -199,6 +199,12 @@ scoutpack mcp .
 
 Starts a read-only MCP server over the existing local index. Tools include `search`, `context`, `file_summary`, `symbol`, `commands`, and `stats`.
 
+```bash
+scoutpack completions zsh > _scoutpack
+```
+
+Generates shell completions for `bash`, `zsh`, `fish`, `powershell`, or `elvish`.
+
 ## Supported Today
 
 | Area | Support |
@@ -210,6 +216,7 @@ Starts a read-only MCP server over the existing local index. Tools include `sear
 | Search | SQLite FTS5 plus deterministic ranking |
 | Context | markdown packets with budget-aware snippets |
 | MCP | read-only stdio server for agent clients |
+| Distribution | Cargo install plus generated shell completions |
 | Privacy | local-only index, sensitive file skips |
 
 ## Not In Scope Yet
@@ -236,6 +243,7 @@ Security details: [SECURITY.md](SECURITY.md).
 ## Docs
 
 - [Installation](docs/installation.md)
+- [Distribution](docs/distribution.md)
 - [MCP server](docs/mcp.md)
 - [AI agent workflows](docs/ai-agent-workflows.md)
 - [Use cases](docs/use-cases.md)

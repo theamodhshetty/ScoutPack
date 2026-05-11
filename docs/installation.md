@@ -50,6 +50,27 @@ cargo install --path . --force
 cargo uninstall scoutpack
 ```
 
+## Shell Completions
+
+Generate completion scripts from the installed binary:
+
+```bash
+scoutpack completions bash
+scoutpack completions zsh
+scoutpack completions fish
+scoutpack completions powershell
+scoutpack completions elvish
+```
+
+Example for zsh:
+
+```bash
+mkdir -p ~/.zfunc
+scoutpack completions zsh > ~/.zfunc/_scoutpack
+```
+
+Ensure `~/.zfunc` is in your `fpath` before `compinit`.
+
 ## First Run
 
 Inside a project repo:

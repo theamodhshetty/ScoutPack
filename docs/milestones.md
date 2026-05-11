@@ -82,11 +82,17 @@ ScoutPack development stays milestone-driven. Each major milestone should end wi
 - `search`, `context`, `file_summary`, `symbol`, `commands`, `stats`
 - no write, network, or shell execution capabilities
 
-## Next
-
 ### M10: Packaging And Distribution
 
 - crates.io release checklist
-- install verification from a clean machine
 - shell completion generation
-- example MCP client smoke test
+- distribution docs
+
+## Next
+
+### M11: Index Coverage
+
+- Python and Go chunking
+- Rust symbol extraction
+- lockfile/package manager detection
+- monorepo workspace summaries
