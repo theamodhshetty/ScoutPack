@@ -19,3 +19,6 @@ ScoutPack skips patterns including `.env`, `.env.*`, `*.pem`, `*.key`, `id_rsa`,
 
 Please open a private security advisory or contact maintainers before public disclosure.
 
+## Current Limitations
+
+ScoutPack is a local indexing tool, not a secret scanner. Sensitive patterns are skipped as a safety baseline, but users should still keep private keys, tokens, and credentials out of repositories.

@@ -9,6 +9,9 @@
 - Token-budgeted markdown context packets.
 - No cloud calls, telemetry, auto-edits, or project command execution.
 - Incremental indexing for unchanged files.
+- tree-sitter TypeScript/TSX symbol extraction.
+- context ranking that favors likely edit files.
+- release-ready docs and examples.
 
 ## v0.2
 
@@ -18,7 +21,6 @@
 
 ## Later
 
-- Better TypeScript parsing with tree-sitter-backed AST extraction.
 - Local vector search only after deterministic ranking works.
 - crates.io, Homebrew, and optional npm wrapper distribution.
 

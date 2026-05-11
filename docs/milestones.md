@@ -52,8 +52,6 @@ ScoutPack development stays milestone-driven. Each major milestone should end wi
 - exported type/interface and const component extraction
 - heuristic parser fallback for parse errors
 
-## Next
-
 ### M7: Context Quality
 
 - preserve required Commands and Risks sections under tight budgets
@@ -70,6 +68,9 @@ ScoutPack development stays milestone-driven. Each major milestone should end wi
 - release checklist
 - crates.io metadata cleanup
 - installation docs
+- README demo output and support matrix
+
+## Next
 
 ### M9: MCP v0.2
 
