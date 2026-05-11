@@ -1,49 +1,137 @@
-<svg width="920" height="420" viewBox="0 0 920 420" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
-  <title id="title">ScoutPack efficiency model</title>
-  <desc id="desc">Visual model showing broad repo scanning compared with a focused ScoutPack packet.</desc>
+<svg width="1200" height="680" viewBox="0 0 1200 680" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">ScoutPack efficiency dashboard</title>
+  <desc id="desc">A dashboard style graphic showing broad repo scanning transformed into a focused ScoutPack context packet for AI coding agents.</desc>
   <style>
-    .title { font: 800 34px ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; letter-spacing: 0; }
-    .label { font: 700 21px ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; letter-spacing: 0; }
-    .text { font: 500 18px ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; letter-spacing: 0; }
-    .mono { font: 700 18px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; letter-spacing: 0; }
-    @media (prefers-color-scheme: dark) {
-      .bg { fill: #0f172a; }
-      .card { fill: #111827; stroke: #334155; }
-      .title { fill: #f8fafc; }
-      .label { fill: #f8fafc; }
-      .text { fill: #cbd5e1; }
-      .axis { stroke: #475569; }
-    }
+    .title { font: 800 42px ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; letter-spacing: 0; }
+    .subtitle { font: 500 22px ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; letter-spacing: 0; }
+    .h2 { font: 800 25px ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; letter-spacing: 0; }
+    .text { font: 600 18px ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; letter-spacing: 0; }
+    .muted { font: 500 16px ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; letter-spacing: 0; }
+    .mono { font: 700 16px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; letter-spacing: 0; }
+    .tiny { font: 700 13px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; letter-spacing: 0; }
   </style>
-  <rect class="bg" width="920" height="420" rx="30" fill="#F8FAFC"/>
-  <text class="title" x="42" y="58" fill="#0F172A">Less repo wandering. More useful first context.</text>
-  <text class="text" x="44" y="92" fill="#64748B">Illustrative model: set a budget, pack task-specific context, keep the agent on the right files.</text>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="680" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#07111F"/>
+      <stop offset="0.5" stop-color="#0F172A"/>
+      <stop offset="1" stop-color="#111827"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="179" y1="157" x2="980" y2="542" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#22D3EE"/>
+      <stop offset="0.48" stop-color="#6366F1"/>
+      <stop offset="1" stop-color="#F59E0B"/>
+    </linearGradient>
+    <linearGradient id="good" x1="705" y1="222" x2="1094" y2="537" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#14B8A6"/>
+      <stop offset="1" stop-color="#22C55E"/>
+    </linearGradient>
+    <linearGradient id="bad" x1="76" y1="211" x2="444" y2="520" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F97316"/>
+      <stop offset="1" stop-color="#EF4444"/>
+    </linearGradient>
+    <filter id="softShadow" x="-30" y="-30" width="1260" height="760" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="24" stdDeviation="26" flood-color="#000000" flood-opacity="0.35"/>
+    </filter>
+    <filter id="glow" x="-80" y="-80" width="1360" height="840" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="34"/>
+    </filter>
+  </defs>
 
-  <rect class="card" x="42" y="122" width="390" height="230" rx="18" fill="#FFFFFF" stroke="#CBD5E1"/>
-  <text class="label" x="72" y="162" fill="#0F172A">Broad agent scan</text>
-  <text class="text" x="72" y="194" fill="#64748B">Manual file hunting, broad reads, repeated context.</text>
-  <rect x="72" y="228" width="292" height="34" rx="9" fill="#EF4444"/>
-  <rect x="72" y="278" width="250" height="34" rx="9" fill="#F97316"/>
-  <rect x="72" y="328" width="210" height="10" rx="5" fill="#CBD5E1"/>
-  <text class="mono" x="378" y="252" text-anchor="end" fill="#7F1D1D">10k+</text>
-  <text class="mono" x="337" y="302" text-anchor="end" fill="#7C2D12">high</text>
-  <text class="text" x="72" y="374" fill="#64748B">More tokens before first useful edit</text>
+  <rect width="1200" height="680" rx="36" fill="url(#bg)"/>
+  <g filter="url(#glow)" opacity="0.5">
+    <circle cx="244" cy="132" r="120" fill="#22D3EE"/>
+    <circle cx="953" cy="168" r="126" fill="#8B5CF6"/>
+    <circle cx="824" cy="566" r="114" fill="#F59E0B"/>
+  </g>
+  <path d="M35 558C176 472 321 456 470 510C642 572 778 544 894 446C990 365 1088 338 1170 377" stroke="#334155" stroke-width="2"/>
+  <path d="M46 133C188 77 331 83 475 151C646 232 817 198 990 101C1054 65 1114 55 1161 66" stroke="#1E293B" stroke-width="2"/>
 
-  <rect class="card" x="488" y="122" width="390" height="230" rx="18" fill="#FFFFFF" stroke="#CBD5E1"/>
-  <text class="label" x="518" y="162" fill="#0F172A">ScoutPack packet</text>
-  <text class="text" x="518" y="194" fill="#64748B">Ranked files, symbols, commands, risks, snippets.</text>
-  <rect x="518" y="228" width="110" height="34" rx="9" fill="#14B8A6"/>
-  <rect x="518" y="278" width="92" height="34" rx="9" fill="#6366F1"/>
-  <rect x="518" y="328" width="252" height="10" rx="5" fill="#F59E0B"/>
-  <text class="mono" x="642" y="252" fill="#115E59">2.5k</text>
-  <text class="mono" x="625" y="302" fill="#3730A3">low</text>
-  <text class="text" x="518" y="374" fill="#64748B">Smaller start, clearer edit path</text>
+  <text class="title" x="68" y="86" fill="#F8FAFC">Turn repo sprawl into a focused agent packet</text>
+  <text class="subtitle" x="70" y="122" fill="#CBD5E1">Local index -> ranked context -> MCP / JSON / Markdown handoff</text>
 
-  <line class="axis" x1="72" y1="214" x2="842" y2="214" stroke="#E2E8F0"/>
-  <text class="mono" x="72" y="217" fill="#64748B" transform="translate(0 -10)">context tokens</text>
-  <text class="mono" x="72" y="267" fill="#64748B" transform="translate(0 -10)">search friction</text>
-  <text class="mono" x="72" y="327" fill="#64748B" transform="translate(0 -10)">task signals</text>
+  <g filter="url(#softShadow)">
+    <rect x="64" y="168" width="322" height="392" rx="24" fill="#0B1220" stroke="#334155"/>
+    <rect x="88" y="194" width="112" height="34" rx="17" fill="#3B1722" stroke="#FB7185"/>
+    <text class="mono" x="110" y="216" fill="#FDA4AF">before</text>
+    <text class="h2" x="88" y="264" fill="#F8FAFC">Broad scan</text>
+    <text class="muted" x="88" y="294" fill="#94A3B8">Agent starts by reading wide.</text>
 
-  <path d="M430 226C455 226 465 226 490 226" stroke="#94A3B8" stroke-width="4" stroke-linecap="round"/>
-  <path d="M475 214L491 226L475 238" stroke="#94A3B8" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <g opacity="0.95">
+      <rect x="88" y="332" width="250" height="26" rx="8" fill="url(#bad)"/>
+      <rect x="88" y="374" width="214" height="26" rx="8" fill="#F97316"/>
+      <rect x="88" y="416" width="178" height="26" rx="8" fill="#FB7185"/>
+      <rect x="88" y="458" width="126" height="26" rx="8" fill="#64748B"/>
+    </g>
+    <text class="text" x="88" y="326" fill="#E2E8F0">context tokens</text>
+    <text class="mono" x="350" y="352" text-anchor="end" fill="#FCA5A5">10k+</text>
+    <text class="text" x="88" y="368" fill="#E2E8F0">file wandering</text>
+    <text class="mono" x="350" y="394" text-anchor="end" fill="#FED7AA">high</text>
+    <text class="text" x="88" y="410" fill="#E2E8F0">duplicate reads</text>
+    <text class="mono" x="350" y="436" text-anchor="end" fill="#FBCFE8">often</text>
+    <text class="text" x="88" y="452" fill="#E2E8F0">task signals</text>
+    <text class="mono" x="350" y="478" text-anchor="end" fill="#CBD5E1">mixed</text>
+    <path d="M92 518H338" stroke="#334155" stroke-width="2"/>
+    <text class="muted" x="88" y="543" fill="#94A3B8">More prompt before first useful edit.</text>
+  </g>
+
+  <g filter="url(#softShadow)">
+    <rect x="438" y="158" width="324" height="412" rx="28" fill="#101827" stroke="url(#accent)" stroke-width="2"/>
+    <rect x="474" y="192" width="252" height="54" rx="16" fill="#0F172A" stroke="#334155"/>
+    <text class="mono" x="499" y="226" fill="#67E8F9">scoutpack pack .</text>
+    <text class="h2" x="474" y="296" fill="#F8FAFC">Context compiler</text>
+    <text class="muted" x="474" y="326" fill="#CBD5E1">Build once. Query by task.</text>
+
+    <g>
+      <rect x="474" y="362" width="214" height="40" rx="13" fill="#12283A" stroke="#22D3EE"/>
+      <text class="mono" x="497" y="387" fill="#A5F3FC">SQLite + FTS5 index</text>
+      <rect x="474" y="418" width="214" height="40" rx="13" fill="#1F1B3A" stroke="#8B5CF6"/>
+      <text class="mono" x="497" y="443" fill="#DDD6FE">symbols + imports</text>
+      <rect x="474" y="474" width="214" height="40" rx="13" fill="#332412" stroke="#F59E0B"/>
+      <text class="mono" x="497" y="499" fill="#FDE68A">commands + risks</text>
+    </g>
+
+    <circle cx="712" cy="382" r="7" fill="#22D3EE"/>
+    <circle cx="712" cy="438" r="7" fill="#8B5CF6"/>
+    <circle cx="712" cy="494" r="7" fill="#F59E0B"/>
+    <path d="M712 389V431M712 445V487" stroke="#475569" stroke-width="3" stroke-linecap="round"/>
+  </g>
+
+  <g filter="url(#softShadow)">
+    <rect x="814" y="168" width="322" height="392" rx="24" fill="#071B18" stroke="#2DD4BF"/>
+    <rect x="838" y="194" width="96" height="34" rx="17" fill="#083D35" stroke="#2DD4BF"/>
+    <text class="mono" x="860" y="216" fill="#99F6E4">after</text>
+    <text class="h2" x="838" y="264" fill="#F8FAFC">Focused packet</text>
+    <text class="muted" x="838" y="294" fill="#A7F3D0">Agent starts from likely files.</text>
+
+    <rect x="838" y="326" width="246" height="62" rx="16" fill="#0F2F2B" stroke="#14B8A6"/>
+    <text class="mono" x="862" y="352" fill="#CCFBF1">--budget 2500</text>
+    <text class="muted" x="862" y="375" fill="#99F6E4">bounded first context</text>
+
+    <rect x="838" y="414" width="246" height="92" rx="16" fill="#0B1220" stroke="#334155"/>
+    <text class="tiny" x="862" y="444" fill="#E2E8F0">Relevant Files</text>
+    <text class="tiny" x="862" y="470" fill="#67E8F9">src/middleware/auth.ts</text>
+    <text class="tiny" x="862" y="493" fill="#FDE68A">test: vitest</text>
+
+    <rect x="838" y="522" width="76" height="28" rx="10" fill="#064E3B"/>
+    <text class="tiny" x="856" y="541" fill="#A7F3D0">MCP</text>
+    <rect x="930" y="522" width="82" height="28" rx="10" fill="#172554"/>
+    <text class="tiny" x="950" y="541" fill="#BFDBFE">JSON</text>
+    <rect x="1028" y="522" width="56" height="28" rx="10" fill="#451A03"/>
+    <text class="tiny" x="1043" y="541" fill="#FDE68A">MD</text>
+  </g>
+
+  <path d="M388 354C418 354 417 354 438 354" stroke="url(#accent)" stroke-width="6" stroke-linecap="round"/>
+  <path d="M420 337L440 354L420 371" stroke="#22D3EE" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M762 354C792 354 791 354 812 354" stroke="url(#good)" stroke-width="6" stroke-linecap="round"/>
+  <path d="M794 337L814 354L794 371" stroke="#22C55E" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <g>
+    <rect x="272" y="604" width="656" height="44" rx="22" fill="#0B1220" stroke="#334155"/>
+    <text class="mono" x="302" y="632" fill="#94A3B8">design goal:</text>
+    <text class="mono" x="423" y="632" fill="#E2E8F0">less context waste</text>
+    <text class="mono" x="604" y="632" fill="#64748B">+</text>
+    <text class="mono" x="630" y="632" fill="#E2E8F0">faster agent handoff</text>
+    <text class="mono" x="828" y="632" fill="#64748B">+</text>
+    <text class="mono" x="854" y="632" fill="#E2E8F0">local-only</text>
+  </g>
 </svg>
