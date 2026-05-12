@@ -185,11 +185,25 @@ pub fn classify_path(path: &Path) -> Option<(String, String)> {
         "ts" | "tsx" => Some(("typescript".to_owned(), ts_kind(path))),
         "py" => Some(("python".to_owned(), python_kind(path))),
         "rs" => Some(("rust".to_owned(), rust_kind(path))),
+        "go" => Some(("go".to_owned(), go_kind(path))),
+        "sol" => Some(("solidity".to_owned(), "smart-contract".to_owned())),
         "md" | "mdx" => Some(("markdown".to_owned(), "doc".to_owned())),
         "json" => Some(("json".to_owned(), json_kind(&file_name))),
         "yaml" | "yml" => Some(("yaml".to_owned(), "config".to_owned())),
         "toml" => Some(("toml".to_owned(), "config".to_owned())),
         _ => None,
+    }
+}
+
+fn go_kind(path: &Path) -> String {
+    let file_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("");
+    if file_name.ends_with("_test.go") {
+        "test".to_owned()
+    } else {
+        "source".to_owned()
     }
 }
 
@@ -252,6 +266,8 @@ fn language_enabled(language: &str, config: &ScoutpackConfig) -> bool {
         "typescript" => config.languages.typescript,
         "python" => config.languages.python,
         "rust" => config.languages.rust,
+        "go" => config.languages.go,
+        "solidity" => config.languages.solidity,
         "markdown" => config.languages.markdown,
         "json" => config.languages.json,
         "yaml" => config.languages.yaml,
@@ -451,6 +467,18 @@ mod tests {
         assert_eq!(
             classify_path(Path::new("src/lib.rs")).unwrap(),
             ("rust".to_owned(), "library-entry".to_owned())
+        );
+        assert_eq!(
+            classify_path(Path::new("internal/api/user.go")).unwrap(),
+            ("go".to_owned(), "source".to_owned())
+        );
+        assert_eq!(
+            classify_path(Path::new("internal/api/user_test.go")).unwrap(),
+            ("go".to_owned(), "test".to_owned())
+        );
+        assert_eq!(
+            classify_path(Path::new("contracts/Vault.sol")).unwrap(),
+            ("solidity".to_owned(), "smart-contract".to_owned())
         );
     }
 }

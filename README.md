@@ -345,6 +345,8 @@ Generates shell completions for `bash`, `zsh`, `fish`, `powershell`, or `elvish`
 | TypeScript / TSX | tree-sitter symbols, imports, functions, components, route handlers |
 | Python | tree-sitter functions, classes, imports, FastAPI-style route decorators |
 | Rust | tree-sitter functions, structs, enums, traits, impl blocks, modules, use imports |
+| Go | tree-sitter packages, imports, functions, methods, structs, interfaces |
+| Solidity | tree-sitter contracts, interfaces, libraries, functions, modifiers, events, imports |
 | Markdown | heading-based sections |
 | JSON | package scripts, dependencies, framework signals |
 | YAML / TOML | config chunks |

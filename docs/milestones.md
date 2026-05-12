@@ -115,6 +115,7 @@ ScoutPack development stays milestone-driven. Each major milestone should end wi
 
 - Python chunking and symbol extraction
 - Rust symbol extraction
-- Go chunking
+- Go chunking and symbol extraction
+- Solidity chunking and symbol extraction
 - lockfile/package manager detection
 - monorepo workspace summaries

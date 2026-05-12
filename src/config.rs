@@ -23,6 +23,10 @@ pub struct LanguageConfig {
     #[serde(default = "default_true")]
     pub rust: bool,
     #[serde(default = "default_true")]
+    pub go: bool,
+    #[serde(default = "default_true")]
+    pub solidity: bool,
+    #[serde(default = "default_true")]
     pub markdown: bool,
     #[serde(default = "default_true")]
     pub json: bool,
@@ -48,6 +52,8 @@ impl Default for ScoutpackConfig {
                 typescript: true,
                 python: true,
                 rust: true,
+                go: true,
+                solidity: true,
                 markdown: true,
                 json: true,
                 yaml: true,
@@ -121,6 +127,8 @@ mod tests {
         assert!(parsed.languages.typescript);
         assert!(parsed.languages.python);
         assert!(parsed.languages.rust);
+        assert!(parsed.languages.go);
+        assert!(parsed.languages.solidity);
     }
 
     #[test]
@@ -146,5 +154,7 @@ symbol_match_boost = 0.35
         .unwrap();
         assert!(parsed.languages.python);
         assert!(parsed.languages.rust);
+        assert!(parsed.languages.go);
+        assert!(parsed.languages.solidity);
     }
 }

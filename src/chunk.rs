@@ -46,6 +46,8 @@ pub fn chunk_file(path: &str, language: &str, text: &str) -> ChunkedFile {
         "typescript" => chunk_typescript(path, text),
         "python" => chunk_python(path, text),
         "rust" => chunk_rust(path, text),
+        "go" => chunk_go(path, text),
+        "solidity" => chunk_solidity(path, text),
         "yaml" | "toml" => chunk_config(path, text),
         _ => fallback_file_chunk(path, text),
     }
@@ -508,6 +510,231 @@ fn rust_symbol_from_node(node: Node<'_>, text: &str) -> Option<(String, String)>
     Some((kind.to_owned(), name))
 }
 
+fn chunk_go(path: &str, text: &str) -> ChunkedFile {
+    let mut parser = Parser::new();
+    if parser
+        .set_language(&tree_sitter_go::LANGUAGE.into())
+        .is_err()
+    {
+        return ChunkedFile {
+            chunks: fallback_line_windows(path, text, 80),
+            ..ChunkedFile::default()
+        };
+    }
+    let Some(tree) = parser.parse(text, None) else {
+        return ChunkedFile {
+            chunks: fallback_line_windows(path, text, 80),
+            ..ChunkedFile::default()
+        };
+    };
+    let root = tree.root_node();
+    if root.has_error() {
+        return ChunkedFile {
+            chunks: fallback_line_windows(path, text, 80),
+            ..ChunkedFile::default()
+        };
+    }
+
+    let mut imports = Vec::new();
+    let mut symbols = Vec::new();
+    let mut chunks = Vec::new();
+    let mut cursor = root.walk();
+    for node in root.named_children(&mut cursor) {
+        match node.kind() {
+            "package_clause" => {
+                if let Some(name) = go_package_name(node, text) {
+                    push_symbol_chunk(
+                        &mut symbols,
+                        &mut chunks,
+                        node,
+                        "package".to_owned(),
+                        name,
+                        text,
+                    );
+                }
+            }
+            "import_declaration" => {
+                for import in quoted_strings(&node_text(node, text)) {
+                    imports.push(Import {
+                        to_path: import,
+                        symbol: None,
+                    });
+                }
+            }
+            "function_declaration" | "method_declaration" => {
+                if let Some(name) = node
+                    .child_by_field_name("name")
+                    .map(|name| node_text(name, text))
+                {
+                    let kind = if node.kind() == "method_declaration" {
+                        "method"
+                    } else {
+                        "function"
+                    };
+                    push_symbol_chunk(&mut symbols, &mut chunks, node, kind.to_owned(), name, text);
+                }
+            }
+            "type_declaration" => {
+                let mut type_cursor = node.walk();
+                for child in node.named_children(&mut type_cursor) {
+                    if child.kind() == "type_spec" {
+                        if let Some((kind, name)) = go_type_from_spec(child, text) {
+                            push_symbol_chunk(&mut symbols, &mut chunks, child, kind, name, text);
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    if chunks.is_empty() {
+        chunks = fallback_line_windows(path, text, 80);
+    }
+    ChunkedFile {
+        chunks,
+        symbols,
+        imports,
+        ..ChunkedFile::default()
+    }
+}
+
+fn go_package_name(node: Node<'_>, text: &str) -> Option<String> {
+    node_text(node, text)
+        .trim()
+        .strip_prefix("package")
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+        .map(ToOwned::to_owned)
+}
+
+fn go_type_from_spec(node: Node<'_>, text: &str) -> Option<(String, String)> {
+    let name = node
+        .child_by_field_name("name")
+        .map(|name| node_text(name, text))?;
+    let kind = if find_descendant_by_kind(node, "struct_type").is_some() {
+        "struct"
+    } else if find_descendant_by_kind(node, "interface_type").is_some() {
+        "interface"
+    } else {
+        "type"
+    };
+    Some((kind.to_owned(), name))
+}
+
+fn chunk_solidity(path: &str, text: &str) -> ChunkedFile {
+    let mut parser = Parser::new();
+    if parser
+        .set_language(&tree_sitter_solidity::LANGUAGE.into())
+        .is_err()
+    {
+        return ChunkedFile {
+            chunks: fallback_line_windows(path, text, 80),
+            ..ChunkedFile::default()
+        };
+    }
+    let Some(tree) = parser.parse(text, None) else {
+        return ChunkedFile {
+            chunks: fallback_line_windows(path, text, 80),
+            ..ChunkedFile::default()
+        };
+    };
+    let root = tree.root_node();
+    if root.has_error() {
+        return ChunkedFile {
+            chunks: fallback_line_windows(path, text, 80),
+            ..ChunkedFile::default()
+        };
+    }
+
+    let mut imports = Vec::new();
+    let mut symbols = Vec::new();
+    let mut chunks = Vec::new();
+    collect_solidity(root, text, &mut imports, &mut symbols, &mut chunks);
+
+    if chunks.is_empty() {
+        chunks = fallback_line_windows(path, text, 80);
+    }
+    ChunkedFile {
+        chunks,
+        symbols,
+        imports,
+        ..ChunkedFile::default()
+    }
+}
+
+fn collect_solidity(
+    node: Node<'_>,
+    text: &str,
+    imports: &mut Vec<Import>,
+    symbols: &mut Vec<Symbol>,
+    chunks: &mut Vec<Chunk>,
+) {
+    match node.kind() {
+        "import_directive" => {
+            for import in quoted_strings(&node_text(node, text)) {
+                imports.push(Import {
+                    to_path: import,
+                    symbol: None,
+                });
+            }
+        }
+        "contract_declaration"
+        | "interface_declaration"
+        | "library_declaration"
+        | "function_definition"
+        | "modifier_definition"
+        | "event_definition" => {
+            if let Some((kind, name)) = solidity_symbol_from_node(node, text) {
+                push_symbol_chunk(symbols, chunks, node, kind, name, text);
+            }
+        }
+        _ => {}
+    }
+
+    let mut cursor = node.walk();
+    for child in node.named_children(&mut cursor) {
+        collect_solidity(child, text, imports, symbols, chunks);
+    }
+}
+
+fn solidity_symbol_from_node(node: Node<'_>, text: &str) -> Option<(String, String)> {
+    let kind = match node.kind() {
+        "contract_declaration" => "contract",
+        "interface_declaration" => "interface",
+        "library_declaration" => "library",
+        "function_definition" => "function",
+        "modifier_definition" => "modifier",
+        "event_definition" => "event",
+        _ => return None,
+    };
+    let name = node
+        .child_by_field_name("name")
+        .map(|name| node_text(name, text))
+        .filter(|name| !name.is_empty())?;
+    Some((kind.to_owned(), name))
+}
+
+fn quoted_strings(text: &str) -> Vec<String> {
+    let mut values = Vec::new();
+    let mut chars = text.char_indices().peekable();
+    while let Some((start, quote)) = chars.next() {
+        if quote != '"' && quote != '\'' {
+            continue;
+        }
+        for (end, ch) in chars.by_ref() {
+            if ch == quote {
+                let value = text[start + quote.len_utf8()..end].trim();
+                if !value.is_empty() {
+                    values.push(value.to_owned());
+                }
+                break;
+            }
+        }
+    }
+    values
+}
+
 fn push_symbol_chunk(
     symbols: &mut Vec<Symbol>,
     chunks: &mut Vec<Chunk>,
@@ -904,5 +1131,50 @@ mod tests {
         assert!(symbols.contains(&("trait", "Runnable")));
         assert!(symbols.contains(&("impl", "impl Cli")));
         assert!(symbols.contains(&("function", "execute")));
+    }
+
+    #[test]
+    fn go_extracts_package_imports_functions_methods_and_types() {
+        let text = "package api\n\nimport (\n    \"context\"\n    \"net/http\"\n)\n\ntype User struct {\n    ID string\n}\n\ntype Store interface {\n    Get(context.Context, string) (User, error)\n}\n\nfunc NewUser() User {\n    return User{}\n}\n\nfunc (u User) Validate() bool {\n    return u.ID != \"\"\n}\n";
+        let chunked = chunk_file("internal/api/user.go", "go", text);
+        let symbols: Vec<_> = chunked
+            .symbols
+            .iter()
+            .map(|symbol| (symbol.kind.as_str(), symbol.name.as_str()))
+            .collect();
+        assert!(chunked
+            .imports
+            .iter()
+            .any(|import| import.to_path == "context"));
+        assert!(chunked
+            .imports
+            .iter()
+            .any(|import| import.to_path == "net/http"));
+        assert!(symbols.contains(&("package", "api")));
+        assert!(symbols.contains(&("struct", "User")));
+        assert!(symbols.contains(&("interface", "Store")));
+        assert!(symbols.contains(&("function", "NewUser")));
+        assert!(symbols.contains(&("method", "Validate")));
+    }
+
+    #[test]
+    fn solidity_extracts_contracts_interfaces_libraries_functions_modifiers_events_and_imports() {
+        let text = "import \"./Ownable.sol\";\n\ninterface IERC20 {\n    function transfer(address to, uint256 amount) external returns (bool);\n}\n\nlibrary SafeMath {\n    function add(uint256 a, uint256 b) internal pure returns (uint256) { return a + b; }\n}\n\ncontract Vault is Ownable {\n    event Withdraw(address indexed user, uint256 amount);\n\n    modifier onlyOwner() {\n        _;\n    }\n\n    function withdraw(uint256 amount) external onlyOwner {\n        emit Withdraw(msg.sender, amount);\n    }\n}\n";
+        let chunked = chunk_file("contracts/Vault.sol", "solidity", text);
+        let symbols: Vec<_> = chunked
+            .symbols
+            .iter()
+            .map(|symbol| (symbol.kind.as_str(), symbol.name.as_str()))
+            .collect();
+        assert!(chunked
+            .imports
+            .iter()
+            .any(|import| import.to_path == "./Ownable.sol"));
+        assert!(symbols.contains(&("interface", "IERC20")));
+        assert!(symbols.contains(&("library", "SafeMath")));
+        assert!(symbols.contains(&("contract", "Vault")));
+        assert!(symbols.contains(&("event", "Withdraw")));
+        assert!(symbols.contains(&("modifier", "onlyOwner")));
+        assert!(symbols.contains(&("function", "withdraw")));
     }
 }
