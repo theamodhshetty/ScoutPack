@@ -8,6 +8,7 @@ mod mcp;
 mod output;
 mod scanner;
 mod search;
+mod semantic;
 mod token_budget;
 mod watch;
 
@@ -25,14 +26,25 @@ async fn main() -> Result<()> {
             config::init_project(&path)?;
             println!("ScoutPack initialized at {}", path.display());
         }
-        Commands::Pack { path } => {
-            let summary = index::pack_repo(&path)?;
+        Commands::Pack {
+            path,
+            embed,
+            allow_model_download,
+        } => {
+            let summary = index::pack_repo_with_options(
+                &path,
+                index::PackOptions {
+                    embed,
+                    allow_model_download,
+                },
+            )?;
             println!(
-                "Indexed {} files, reused {} unchanged, removed {}, added {} chunks, skipped {} files.",
+                "Indexed {} files, reused {} unchanged, removed {}, added {} chunks, added {} embeddings, skipped {} files.",
                 summary.files_indexed,
                 summary.files_reused,
                 summary.files_removed,
                 summary.chunks_indexed,
+                summary.embeddings_indexed,
                 summary.files_skipped
             );
             println!("Index: {}", summary.index_path.display());
@@ -45,8 +57,18 @@ async fn main() -> Result<()> {
             limit,
             show_snippets,
             json,
+            semantic,
+            semantic_alpha,
         } => {
-            let results = search::search_current_dir(&query, limit, show_snippets)?;
+            let results = search::search_current_dir_with_options(
+                &query,
+                limit,
+                show_snippets,
+                search::SearchOptions {
+                    semantic,
+                    semantic_alpha,
+                },
+            )?;
             if json {
                 output::print_search_results_json(&query, &results)?;
             } else {
@@ -61,13 +83,19 @@ async fn main() -> Result<()> {
             since,
             diff,
             branch,
+            semantic,
+            semantic_alpha,
         } => {
             let git_mode = context_git_mode(since, diff, branch)?;
             let packet = context::build_context_packet_with_options(
                 ".",
                 &task,
                 budget,
-                context::ContextOptions { git_mode },
+                context::ContextOptions {
+                    git_mode,
+                    semantic,
+                    semantic_alpha,
+                },
             )?;
             let format = if json { ContextFormat::Json } else { format };
             match format {

@@ -139,6 +139,27 @@ fn init_pack_search_context_stats_work() {
     assert_eq!(search_json_value["query"], "auth middleware");
     assert!(search_json_value["results"].is_array());
 
+    #[cfg(not(feature = "semantic"))]
+    {
+        let semantic_search = Command::new(bin())
+            .args(["search", "auth middleware", "--semantic"])
+            .current_dir(temp.path())
+            .output()
+            .unwrap();
+        assert!(!semantic_search.status.success());
+        assert!(String::from_utf8_lossy(&semantic_search.stderr)
+            .contains("requires a binary built with `--features semantic`"));
+
+        let semantic_pack = Command::new(bin())
+            .args(["pack", ".", "--embed"])
+            .current_dir(temp.path())
+            .output()
+            .unwrap();
+        assert!(!semantic_pack.status.success());
+        assert!(String::from_utf8_lossy(&semantic_pack.stderr)
+            .contains("binary built with `--features semantic`"));
+    }
+
     let context = Command::new(bin())
         .args(["context", "fix login redirect loop", "--budget", "2000"])
         .current_dir(temp.path())
@@ -296,6 +317,7 @@ fn init_pack_search_context_stats_work() {
     assert!(completions_out.contains("#compdef scoutpack"));
     assert!(completions_out.contains("completions"));
     assert!(completions_out.contains("watch"));
+    assert!(completions_out.contains("semantic"));
 
     let mut mcp = Command::new(bin())
         .args(["mcp", "."])

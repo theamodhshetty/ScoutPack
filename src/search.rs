@@ -1,4 +1,4 @@
-use crate::{config, index};
+use crate::{config, index, semantic};
 use anyhow::Result;
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::Serialize;
@@ -20,12 +20,28 @@ pub struct SearchResult {
     pub reason: String,
 }
 
-pub fn search_current_dir(
+#[derive(Debug, Clone, Copy)]
+pub struct SearchOptions {
+    pub semantic: bool,
+    pub semantic_alpha: f64,
+}
+
+impl Default for SearchOptions {
+    fn default() -> Self {
+        Self {
+            semantic: false,
+            semantic_alpha: 0.45,
+        }
+    }
+}
+
+pub fn search_current_dir_with_options(
     query: &str,
     limit: usize,
     show_snippets: bool,
+    options: SearchOptions,
 ) -> Result<Vec<SearchResult>> {
-    search_repo(Path::new("."), query, limit, show_snippets)
+    search_repo_with_options(Path::new("."), query, limit, show_snippets, options)
 }
 
 pub fn search_repo(
@@ -33,6 +49,16 @@ pub fn search_repo(
     query: &str,
     limit: usize,
     show_snippets: bool,
+) -> Result<Vec<SearchResult>> {
+    search_repo_with_options(root, query, limit, show_snippets, SearchOptions::default())
+}
+
+pub fn search_repo_with_options(
+    root: &Path,
+    query: &str,
+    limit: usize,
+    show_snippets: bool,
+    options: SearchOptions,
 ) -> Result<Vec<SearchResult>> {
     let conn = index::ensure_index(root)?;
     let config = config::load(root)?;
@@ -86,9 +112,40 @@ pub fn search_repo(
     }
 
     add_symbol_matches(&conn, &terms, &mut results, &config.ranking)?;
+    if options.semantic {
+        let semantic_results = semantic::semantic_search(
+            &conn,
+            query,
+            limit.saturating_mul(5).max(limit),
+            show_snippets,
+        )?;
+        merge_semantic_results(&mut results, semantic_results, options.semantic_alpha);
+    }
     results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(Ordering::Equal));
     results.truncate(limit);
     Ok(results)
+}
+
+fn merge_semantic_results(
+    results: &mut Vec<SearchResult>,
+    semantic_results: Vec<SearchResult>,
+    alpha: f64,
+) {
+    for semantic_result in semantic_results {
+        if let Some(existing) = results.iter_mut().find(|result| {
+            result.path == semantic_result.path
+                && result.start_line == semantic_result.start_line
+                && result.end_line == semantic_result.end_line
+        }) {
+            existing.score = semantic::hybrid_score(existing.score, semantic_result.score, alpha);
+            existing.reason = format!("{}; {}", existing.reason, semantic_result.reason);
+        } else {
+            results.push(SearchResult {
+                score: semantic::hybrid_score(0.0, semantic_result.score, alpha),
+                ..semantic_result
+            });
+        }
+    }
 }
 
 pub fn enrich_with_import_neighbors(

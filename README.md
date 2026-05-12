@@ -286,6 +286,15 @@ scoutpack pack .
 Scans and indexes a repo. Re-running `pack` reuses unchanged files.
 
 ```bash
+cargo install --git https://github.com/theamodhshetty/ScoutPack.git --features semantic
+scoutpack pack . --embed
+scoutpack search "login flow" --semantic
+scoutpack context "fix login flow" --semantic --budget 2500
+```
+
+Optional local semantic search. This is not enabled in default installs. First use may download the local `BAAI/bge-small-en-v1.5` model after confirmation; ScoutPack still stores embeddings only in local SQLite and does not call model APIs.
+
+```bash
 scoutpack watch .
 ```
 
@@ -367,6 +376,7 @@ Generates shell completions for `bash`, `zsh`, `fish`, `powershell`, or `elvish`
 | JSON | package scripts, dependencies, framework signals |
 | YAML / TOML | config chunks |
 | Search | SQLite FTS5 plus deterministic ranking |
+| Optional semantic search | local fastembed embeddings behind `--features semantic`; never enabled by default |
 | Context | markdown packets with budget-aware snippets |
 | MCP | read-only stdio server for agent clients |
 | Distribution | Cargo install plus generated shell completions |
@@ -374,7 +384,6 @@ Generates shell completions for `bash`, `zsh`, `fish`, `powershell`, or `elvish`
 
 ## Not In Scope Yet
 
-- embeddings or vector search
 - cloud sync
 - GUI
 - auto-edits
@@ -386,7 +395,8 @@ Generates shell completions for `bash`, `zsh`, `fish`, `powershell`, or `elvish`
 ScoutPack is offline by design:
 
 - does not send code anywhere
-- does not call external APIs
+- does not call external APIs in default FTS mode
+- optional semantic mode may download a local embedding model only after confirmation
 - does not collect telemetry
 - does not run project commands
 - writes local SQLite index data only under `.scoutpack/`

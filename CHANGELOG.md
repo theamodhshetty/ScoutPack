@@ -11,6 +11,7 @@ All notable ScoutPack changes are tracked here.
 - Git-aware context flags: `--since`, `--diff`, and `--branch`, plus MCP `recent_changes`.
 - Criterion benchmark coverage and real-repo benchmark script/results for cold indexing, incremental indexing, packet reduction, and search latency.
 - `scoutpack watch` mode for debounced local index refreshes during active development.
+- Optional local semantic search behind the `semantic` Cargo feature, with `pack --embed`, `search --semantic`, and `context --semantic`.
 - Machine-readable JSON output for `search`, `context`, and `stats`.
 - Context output formats: markdown, JSON, and XML.
 - Python and Rust symbol/import extraction.

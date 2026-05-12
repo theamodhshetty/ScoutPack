@@ -11,5 +11,6 @@ Pipeline:
 5. Query SQLite FTS5.
 6. Render markdown under approximate token budget.
 
-v0.1 avoids embeddings and command execution.
+Default installs avoid embeddings and command execution.
 
+Optional semantic mode is gated behind the `semantic` Cargo feature. It can store local fastembed vectors in SQLite and combine FTS score with cosine similarity when users pass `--semantic`.

@@ -123,4 +123,5 @@ ScoutPack development stays milestone-driven. Each major milestone should end wi
 - Git-aware context with `--since`, `--diff`, `--branch`, and MCP `recent_changes`
 - Criterion benchmarks and reproducible real-repo benchmark results
 - Watch mode with debounced incremental re-pack output
+- Optional local semantic embeddings behind `--features semantic`
 - monorepo workspace summaries
