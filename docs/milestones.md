@@ -102,6 +102,13 @@ ScoutPack development stays milestone-driven. Each major milestone should end wi
 - agent workflow matrix
 - AGENTS.md usage hint
 
+### M10.3: Security And Context Format Foundation
+
+- expanded sensitive-file skip coverage
+- generated-folder skip coverage
+- context output formats: markdown, JSON, XML
+- token budget summary in context packets
+
 ## Next
 
 ### M11: Index Coverage

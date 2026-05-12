@@ -242,6 +242,11 @@ fn is_sensitive_path(rel: &Path) -> bool {
         || file_name.starts_with(".env.")
         || file_name == "id_rsa"
         || file_name == "id_ed25519"
+        || file_name == "secrets.yaml"
+        || file_name == "secrets.yml"
+        || file_name == "secrets.json"
+        || file_name == ".npmrc"
+        || file_name == ".pypirc"
     {
         return true;
     }
@@ -285,5 +290,111 @@ mod tests {
         let result = scan_repo(temp.path(), &ScoutpackConfig::default()).unwrap();
         assert!(result.files.is_empty());
         assert_eq!(result.skipped[0].reason, "sensitive file pattern");
+    }
+
+    #[test]
+    fn sensitive_file_patterns_are_skipped() {
+        let temp = tempfile::tempdir().unwrap();
+        for name in [
+            ".env",
+            ".env.local",
+            ".env.production",
+            "deploy.pem",
+            "private.key",
+            "id_rsa",
+            "id_ed25519",
+            "secrets.yaml",
+            "secrets.json",
+            ".npmrc",
+            ".pypirc",
+        ] {
+            fs::write(temp.path().join(name), "SECRET=value").unwrap();
+        }
+        fs::write(temp.path().join("src.ts"), "export const ok = true;").unwrap();
+
+        let result = scan_repo(temp.path(), &ScoutpackConfig::default()).unwrap();
+        assert_eq!(result.files.len(), 1);
+        assert_eq!(result.files[0].rel_path, "src.ts");
+        let skipped_paths: Vec<_> = result
+            .skipped
+            .iter()
+            .map(|file| file.path.as_str())
+            .collect();
+        for name in [
+            ".env",
+            ".env.local",
+            ".env.production",
+            "deploy.pem",
+            "private.key",
+            "id_rsa",
+            "id_ed25519",
+            "secrets.yaml",
+            "secrets.json",
+            ".npmrc",
+            ".pypirc",
+        ] {
+            assert!(skipped_paths.contains(&name), "{name} not skipped");
+        }
+        assert!(result
+            .skipped
+            .iter()
+            .all(|file| file.reason == "sensitive file pattern"));
+    }
+
+    #[test]
+    fn binary_non_utf8_and_large_files_are_skipped() {
+        let temp = tempfile::tempdir().unwrap();
+        fs::write(temp.path().join("binary.json"), b"{\0}").unwrap();
+        fs::write(temp.path().join("latin1.json"), [0xff, 0xfe, 0xfd]).unwrap();
+        fs::write(temp.path().join("large.ts"), "x".repeat(2048)).unwrap();
+
+        let mut config = ScoutpackConfig::default();
+        config.max_file_size_kb = 1;
+        let result = scan_repo(temp.path(), &config).unwrap();
+
+        assert!(result.files.is_empty());
+        assert!(result
+            .skipped
+            .iter()
+            .any(|file| file.path == "binary.json" && file.reason == "binary file"));
+        assert!(result
+            .skipped
+            .iter()
+            .any(|file| file.path == "latin1.json" && file.reason == "non-utf8 text"));
+        assert!(result
+            .skipped
+            .iter()
+            .any(|file| file.path == "large.ts" && file.reason == "file exceeds 1 KB"));
+    }
+
+    #[test]
+    fn generated_and_ignored_dirs_are_not_indexed() {
+        let temp = tempfile::tempdir().unwrap();
+        for dir in [
+            "node_modules",
+            ".git",
+            ".next",
+            "dist",
+            "build",
+            "coverage",
+            "target",
+            ".venv",
+        ] {
+            fs::create_dir_all(temp.path().join(dir)).unwrap();
+            fs::write(
+                temp.path().join(dir).join("generated.ts"),
+                "export const generated = true;",
+            )
+            .unwrap();
+        }
+        fs::write(temp.path().join("src.ts"), "export const ok = true;").unwrap();
+
+        let result = scan_repo(temp.path(), &ScoutpackConfig::default()).unwrap();
+        assert_eq!(result.files.len(), 1);
+        assert_eq!(result.files[0].rel_path, "src.ts");
+        assert!(!result
+            .files
+            .iter()
+            .any(|file| file.rel_path.contains("generated.ts")));
     }
 }

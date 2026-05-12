@@ -309,6 +309,12 @@ scoutpack context "fix login redirect loop" --budget 2500 --json
 Returns the context packet plus metadata as JSON.
 
 ```bash
+scoutpack context "fix login redirect loop" --format xml
+```
+
+Returns XML-wrapped context for prompt templates. Supported formats: `markdown`, `json`, `xml`.
+
+```bash
 scoutpack stats
 ```
 
@@ -355,7 +361,7 @@ Generates shell completions for `bash`, `zsh`, `fish`, `powershell`, or `elvish`
 - running package scripts
 - live file watching
 
-## Privacy Model
+## Privacy And Security Guarantees
 
 ScoutPack is offline by design:
 
@@ -363,7 +369,12 @@ ScoutPack is offline by design:
 - does not call external APIs
 - does not collect telemetry
 - does not run project commands
-- skips common secret files such as `.env`, private keys, certificates, and provisioning profiles
+- writes local SQLite index data only under `.scoutpack/`
+- supports `.scoutpackignore`
+- skips common secret files such as `.env`, `.env.local`, private keys, certificates, `.npmrc`, `.pypirc`, `secrets.yaml`, and `secrets.json`
+- skips common generated folders such as `node_modules`, `.git`, `.next`, `dist`, `build`, `coverage`, `target`, and `.venv`
+
+Limit: ScoutPack is not a secret scanner. Review generated context before pasting it into any external AI provider.
 
 Security details: [SECURITY.md](SECURITY.md).
 

@@ -60,7 +60,7 @@ pub fn build_context_packet(
         }
     }
 
-    let suffix = required_tail(&commands, task, &results);
+    let suffix = required_tail(&commands, task, &results, budget);
     let mut snippet_section = String::from("\nRelevant Snippets:\n");
     if results.is_empty() || budget < 600 {
         snippet_section.push_str("- Unknown from index\n");
@@ -99,6 +99,7 @@ fn required_tail(
     commands: &[(String, String, String)],
     task: &str,
     results: &[search::SearchResult],
+    budget: usize,
 ) -> String {
     let mut tail = String::new();
     tail.push_str("\nCommands:\n");
@@ -123,6 +124,12 @@ fn required_tail(
             tail.push_str(&format!("- {risk}\n"));
         }
     }
+
+    tail.push_str("\nToken Budget Summary:\n");
+    tail.push_str(&format!("- Target budget: {budget} tokens\n"));
+    tail.push_str(
+        "- ScoutPack keeps required files, commands, and risks before optional snippets.\n",
+    );
     tail
 }
 

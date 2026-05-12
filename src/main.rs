@@ -12,7 +12,7 @@ mod token_budget;
 
 use anyhow::Result;
 use clap::{CommandFactory, Parser};
-use cli::{Cli, Commands};
+use cli::{Cli, Commands, ContextFormat};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -49,12 +49,18 @@ async fn main() -> Result<()> {
                 output::print_search_results(&results);
             }
         }
-        Commands::Context { task, budget, json } => {
+        Commands::Context {
+            task,
+            budget,
+            format,
+            json,
+        } => {
             let packet = context::build_context_packet(".", &task, budget)?;
-            if json {
-                output::print_context_json(&task, budget, &packet)?;
-            } else {
-                print!("{packet}");
+            let format = if json { ContextFormat::Json } else { format };
+            match format {
+                ContextFormat::Markdown => print!("{packet}"),
+                ContextFormat::Json => output::print_context_json(&task, budget, &packet)?,
+                ContextFormat::Xml => output::print_context_xml(&task, budget, &packet)?,
             }
         }
         Commands::Stats { path, json } => {

@@ -9,11 +9,17 @@ ScoutPack is designed for local-only repo indexing.
 - No API keys.
 - No auto-edits.
 - No project command execution in v0.1.
-- Sensitive files are skipped by default.
+- Local SQLite index only.
+- `.scoutpackignore` support.
+- Sensitive files and generated folders are skipped by default.
 
 ## Sensitive Files
 
-ScoutPack skips patterns including `.env`, `.env.*`, `*.pem`, `*.key`, `id_rsa`, `id_ed25519`, `*.p12`, and `*.mobileprovision`.
+ScoutPack skips patterns including `.env`, `.env.*`, `*.pem`, `*.key`, `id_rsa`, `id_ed25519`, `secrets.yaml`, `secrets.json`, `.npmrc`, `.pypirc`, `*.p12`, and `*.mobileprovision`.
+
+## Generated Folders
+
+ScoutPack skips common generated and dependency folders including `node_modules`, `.git`, `.next`, `dist`, `build`, `coverage`, `target`, and `.venv`.
 
 ## Reporting
 

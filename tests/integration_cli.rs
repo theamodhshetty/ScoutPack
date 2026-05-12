@@ -172,6 +172,53 @@ fn init_pack_search_context_stats_work() {
         .as_str()
         .unwrap()
         .contains("Risks:"));
+    assert!(context_json_value["packet"]
+        .as_str()
+        .unwrap()
+        .contains("Token Budget Summary:"));
+
+    let context_format_json = Command::new(bin())
+        .args([
+            "context",
+            "fix login redirect loop",
+            "--budget",
+            "2000",
+            "--format",
+            "json",
+        ])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        context_format_json.status.success(),
+        "{}",
+        String::from_utf8_lossy(&context_format_json.stderr)
+    );
+    let context_format_json_value: serde_json::Value =
+        serde_json::from_slice(&context_format_json.stdout).unwrap();
+    assert_eq!(context_format_json_value["task"], "fix login redirect loop");
+
+    let context_xml = Command::new(bin())
+        .args([
+            "context",
+            "fix login redirect loop",
+            "--budget",
+            "2000",
+            "--format",
+            "xml",
+        ])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        context_xml.status.success(),
+        "{}",
+        String::from_utf8_lossy(&context_xml.stderr)
+    );
+    let context_xml_out = String::from_utf8_lossy(&context_xml.stdout);
+    assert!(context_xml_out.contains("<scoutpack_context>"));
+    assert!(context_xml_out.contains("<estimated_tokens>"));
+    assert!(context_xml_out.contains("&lt;"));
 
     let tiny_context = Command::new(bin())
         .args(["context", "fix login redirect loop", "--budget", "300"])

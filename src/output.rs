@@ -54,6 +54,20 @@ pub fn print_context_json(task: &str, budget: Option<usize>, packet: &str) -> Re
     Ok(())
 }
 
+pub fn print_context_xml(task: &str, budget: Option<usize>, packet: &str) -> Result<()> {
+    let budget = budget
+        .map(|budget| budget.to_string())
+        .unwrap_or_else(|| "default".to_owned());
+    println!(
+        "<scoutpack_context>\n  <task>{}</task>\n  <budget>{}</budget>\n  <estimated_tokens>{}</estimated_tokens>\n  <packet>{}</packet>\n</scoutpack_context>",
+        escape_xml(task),
+        escape_xml(&budget),
+        crate::token_budget::estimate_tokens(packet),
+        escape_xml(packet)
+    );
+    Ok(())
+}
+
 pub fn print_stats(stats: &IndexStats) {
     println!("Index: {}", stats.index_path.display());
     println!("Files: {}", stats.file_count);
@@ -77,6 +91,15 @@ pub fn print_stats(stats: &IndexStats) {
         );
         println!("Recent commits: {}", manifest.recent_commit_subjects.len());
     }
+}
+
+fn escape_xml(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&apos;")
 }
 
 pub fn print_stats_json(stats: &IndexStats) -> Result<()> {

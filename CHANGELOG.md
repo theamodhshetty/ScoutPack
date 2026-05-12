@@ -7,6 +7,7 @@ All notable ScoutPack changes are tracked here.
 ### Added
 
 - Machine-readable JSON output for `search`, `context`, and `stats`.
+- Context output formats: markdown, JSON, and XML.
 - Read-only MCP server with `search`, `context`, `file_summary`, `symbol`, `commands`, and `stats` tools.
 - Shell completion generation for bash, zsh, fish, PowerShell, and Elvish.
 - Project logo and redesigned README landing page.
@@ -32,5 +33,6 @@ All notable ScoutPack changes are tracked here.
 
 ### Security
 
+- Expanded sensitive-file skip tests and generated-folder skip coverage.
 - Sensitive file patterns are skipped by default.
 - No telemetry, cloud calls, API keys, auto-edits, or project command execution.

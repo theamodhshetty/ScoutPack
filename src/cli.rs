@@ -1,4 +1,4 @@
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use clap_complete::Shell;
 use std::path::PathBuf;
 
@@ -49,6 +49,9 @@ pub enum Commands {
         #[arg(short, long)]
         budget: Option<usize>,
 
+        #[arg(long, value_enum, default_value_t = ContextFormat::Markdown)]
+        format: ContextFormat,
+
         #[arg(long, default_value_t = false)]
         json: bool,
     },
@@ -73,4 +76,11 @@ pub enum Commands {
         #[arg(value_enum)]
         shell: Shell,
     },
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
+pub enum ContextFormat {
+    Markdown,
+    Json,
+    Xml,
 }
