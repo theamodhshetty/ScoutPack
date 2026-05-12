@@ -8,6 +8,7 @@ All notable ScoutPack changes are tracked here.
 
 - JavaScript and JSX symbol/import extraction, including ESM imports, CommonJS requires, components, and Express-style route handlers.
 - Python and Go config expansion for `pyproject.toml`, `requirements.txt`, `Pipfile`, `setup.cfg`, and `go.mod` commands/framework signals.
+- Git-aware context flags: `--since`, `--diff`, and `--branch`, plus MCP `recent_changes`.
 - Machine-readable JSON output for `search`, `context`, and `stats`.
 - Context output formats: markdown, JSON, and XML.
 - Python and Rust symbol/import extraction.

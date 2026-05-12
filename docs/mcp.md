@@ -64,6 +64,7 @@ Claude Code project-scoped config can live in `.mcp.json`. VS Code stores worksp
 | `file_summary` | indexed metadata, symbols, and chunk ranges for one file |
 | `symbol` | exact or partial symbol lookup |
 | `commands` | package commands discovered during indexing, never executed |
+| `recent_changes` | local git diff summary for branch, diff, or since ranges |
 | `stats` | index counts and manifest metadata |
 
 ## Notes
@@ -71,6 +72,7 @@ Claude Code project-scoped config can live in `.mcp.json`. VS Code stores worksp
 - Run `scoutpack pack .` again after meaningful repo changes.
 - MCP tools require an existing `.scoutpack/pack.sqlite`.
 - Tool responses include structured JSON plus text content for broad client compatibility.
+- `recent_changes` uses local git metadata only and returns file summaries with line counts, not full diff bodies.
 
 ## Client Docs
 
