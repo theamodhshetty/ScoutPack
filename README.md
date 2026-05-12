@@ -286,6 +286,12 @@ scoutpack pack .
 Scans and indexes a repo. Re-running `pack` reuses unchanged files.
 
 ```bash
+scoutpack watch .
+```
+
+Keeps the local index fresh while you edit. Debounced re-index output goes to stderr.
+
+```bash
 scoutpack search "auth middleware" --limit 5
 ```
 
@@ -373,7 +379,7 @@ Generates shell completions for `bash`, `zsh`, `fish`, `powershell`, or `elvish`
 - GUI
 - auto-edits
 - running package scripts
-- live file watching
+- executing project commands from watch mode
 
 ## Privacy And Security Guarantees
 

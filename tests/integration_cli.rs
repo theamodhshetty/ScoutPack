@@ -3,6 +3,8 @@ use std::{
     io::Write,
     path::Path,
     process::{Command, Stdio},
+    thread,
+    time::{Duration, Instant},
 };
 
 fn bin() -> &'static str {
@@ -293,6 +295,7 @@ fn init_pack_search_context_stats_work() {
     let completions_out = String::from_utf8_lossy(&completions.stdout);
     assert!(completions_out.contains("#compdef scoutpack"));
     assert!(completions_out.contains("completions"));
+    assert!(completions_out.contains("watch"));
 
     let mut mcp = Command::new(bin())
         .args(["mcp", "."])
@@ -360,6 +363,68 @@ fn init_pack_search_context_stats_work() {
         .unwrap()
         .iter()
         .any(|result| result["path"] == "src/middleware/auth.ts"));
+}
+
+#[test]
+fn watch_reindexes_after_file_change() {
+    let temp = tempfile::tempdir().unwrap();
+    copy_dir(Path::new("tests/fixtures/nextjs-basic"), temp.path());
+
+    let init = Command::new(bin())
+        .arg("init")
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        init.status.success(),
+        "{}",
+        String::from_utf8_lossy(&init.stderr)
+    );
+
+    let mut watch = Command::new(bin())
+        .args(["watch", ".", "--debounce-ms", "50"])
+        .current_dir(temp.path())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+
+    let index_path = temp.path().join(".scoutpack/pack.sqlite");
+    let start = Instant::now();
+    while !index_path.exists() && start.elapsed() < Duration::from_secs(5) {
+        thread::sleep(Duration::from_millis(50));
+    }
+    assert!(index_path.exists());
+
+    fs::write(
+        temp.path().join("src/lib/session.ts"),
+        "export function getSession() {\n  return { user: 'demo' };\n}\n\nexport function watchedChange() {\n  return true;\n}\n",
+    )
+    .unwrap();
+
+    let start = Instant::now();
+    let mut found = false;
+    while start.elapsed() < Duration::from_secs(5) {
+        let search = Command::new(bin())
+            .args(["search", "watchedChange", "--limit", "5"])
+            .current_dir(temp.path())
+            .output()
+            .unwrap();
+        if search.status.success()
+            && String::from_utf8_lossy(&search.stdout).contains("watchedChange")
+        {
+            found = true;
+            break;
+        }
+        thread::sleep(Duration::from_millis(100));
+    }
+
+    let _ = watch.kill();
+    let output = watch.wait_with_output().unwrap();
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(found, "watch did not index changed file\nstderr:\n{stderr}");
+    assert!(stderr.contains("[scoutpack] watching"), "{stderr}");
+    assert!(stderr.contains("[scoutpack] reindexed"), "{stderr}");
 }
 
 #[test]

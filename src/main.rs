@@ -9,6 +9,7 @@ mod output;
 mod scanner;
 mod search;
 mod token_budget;
+mod watch;
 
 use anyhow::Result;
 use clap::{CommandFactory, Parser};
@@ -35,6 +36,9 @@ async fn main() -> Result<()> {
                 summary.files_skipped
             );
             println!("Index: {}", summary.index_path.display());
+        }
+        Commands::Watch { path, debounce_ms } => {
+            watch::watch_repo(path, std::time::Duration::from_millis(debounce_ms))?;
         }
         Commands::Search {
             query,
