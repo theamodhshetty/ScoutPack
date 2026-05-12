@@ -121,4 +121,5 @@ ScoutPack development stays milestone-driven. Each major milestone should end wi
 - lockfile/package manager detection
 - Python and Go config command/framework extraction
 - Git-aware context with `--since`, `--diff`, `--branch`, and MCP `recent_changes`
+- Criterion benchmarks and reproducible real-repo benchmark results
 - monorepo workspace summaries
