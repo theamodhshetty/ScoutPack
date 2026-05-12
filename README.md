@@ -91,7 +91,7 @@ No cloud. No API key. No telemetry. No auto-edits. No project command execution.
   <img src="assets/scoutpack-efficiency.svg" width="760" alt="ScoutPack efficiency model">
 </p>
 
-This is budget math, not a benchmark claim: if an agent would otherwise read broad files and chat history before finding the right area, ScoutPack lets you start from a focused packet such as `--budget 2500`.
+ScoutPack keeps the first agent prompt small and targeted: if an agent would otherwise read broad files and chat history before finding the right area, ScoutPack lets you start from a focused packet such as `--budget 2500`. Reproducible numbers live in [benches/RESULTS.md](benches/RESULTS.md).
 
 | Efficiency lever | How ScoutPack helps |
 | --- | --- |

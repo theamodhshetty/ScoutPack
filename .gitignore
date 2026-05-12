@@ -1,5 +1,6 @@
 /target/
 /.scoutpack/
+/.scoutpack-bench-repos/
 /.DS_Store
 
 # Local planning prompts and private notes.
@@ -14,4 +15,3 @@ id_rsa
 id_ed25519
 *.p12
 *.mobileprovision
-
