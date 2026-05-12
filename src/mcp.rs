@@ -1,4 +1,4 @@
-use crate::{context, index, search, token_budget};
+use crate::{context, git, index, search, token_budget};
 use anyhow::{Context, Result};
 use rmcp::{
     handler::server::{router::tool::ToolRouter, wrapper::Parameters},
@@ -55,6 +55,16 @@ struct SymbolRequest {
     query: String,
     #[schemars(description = "Maximum symbol matches to return. Defaults to 10.")]
     limit: Option<usize>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+struct RecentChangesRequest {
+    #[schemars(description = "Boost/summarize files changed since this git ref.")]
+    since: Option<String>,
+    #[schemars(description = "Git diff range like main..HEAD.")]
+    diff: Option<String>,
+    #[schemars(description = "Use current branch against main.")]
+    branch: Option<bool>,
 }
 
 #[tool_router]
@@ -148,6 +158,25 @@ impl ScoutpackMcp {
     }
 
     #[tool(
+        name = "recent_changes",
+        description = "Return local git changed files and line counts for a ref range without reading full diff bodies."
+    )]
+    fn recent_changes(
+        &self,
+        Parameters(RecentChangesRequest {
+            since,
+            diff,
+            branch,
+        }): Parameters<RecentChangesRequest>,
+    ) -> Result<CallToolResult, McpError> {
+        let mode = mcp_git_mode(since, diff, branch.unwrap_or(false)).map_err(to_mcp_error)?;
+        let changes = git::recent_changes(&self.root, &mode).map_err(to_mcp_error)?;
+        Ok(structured(json!({
+            "recent_changes": changes,
+        })))
+    }
+
+    #[tool(
         name = "stats",
         description = "Return index counts and manifest metadata for the configured repo."
     )]
@@ -200,4 +229,31 @@ fn structured(value: Value) -> CallToolResult {
 
 fn to_mcp_error(error: anyhow::Error) -> McpError {
     McpError::internal_error(error.to_string(), None)
+}
+
+fn mcp_git_mode(
+    since: Option<String>,
+    diff: Option<String>,
+    branch: bool,
+) -> Result<git::GitContextMode> {
+    let selected = since.is_some() as u8 + diff.is_some() as u8 + branch as u8;
+    if selected > 1 {
+        anyhow::bail!("Use only one of `since`, `diff`, or `branch`.");
+    }
+    if let Some(since) = since {
+        return Ok(git::GitContextMode::Since(since));
+    }
+    if let Some(diff) = diff {
+        let Some((base, head)) = diff.split_once("..") else {
+            anyhow::bail!("`diff` must use `<base>..<head>`, for example `main..HEAD`.");
+        };
+        if base.is_empty() || head.is_empty() {
+            anyhow::bail!("`diff` must use `<base>..<head>`, for example `main..HEAD`.");
+        }
+        return Ok(git::GitContextMode::Diff {
+            base: base.to_owned(),
+            head: head.to_owned(),
+        });
+    }
+    Ok(git::GitContextMode::Branch)
 }

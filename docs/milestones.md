@@ -120,4 +120,5 @@ ScoutPack development stays milestone-driven. Each major milestone should end wi
 - Solidity chunking and symbol extraction
 - lockfile/package manager detection
 - Python and Go config command/framework extraction
+- Git-aware context with `--since`, `--diff`, `--branch`, and MCP `recent_changes`
 - monorepo workspace summaries

@@ -23,6 +23,21 @@ fn copy_dir(src: &Path, dst: &Path) {
     }
 }
 
+fn run_git(path: &Path, args: &[&str]) {
+    let output = Command::new("git")
+        .args(args)
+        .current_dir(path)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "git {:?}\nstdout:\n{}\nstderr:\n{}",
+        args,
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
 #[test]
 fn init_pack_search_context_stats_work() {
     let temp = tempfile::tempdir().unwrap();
@@ -332,6 +347,7 @@ fn init_pack_search_context_stats_work() {
         .unwrap();
     assert!(tools.iter().any(|tool| tool["name"] == "context"));
     assert!(tools.iter().any(|tool| tool["name"] == "file_summary"));
+    assert!(tools.iter().any(|tool| tool["name"] == "recent_changes"));
     let mcp_stats = messages.iter().find(|message| message["id"] == 3).unwrap()["result"]
         ["structuredContent"]
         .clone();
@@ -344,6 +360,142 @@ fn init_pack_search_context_stats_work() {
         .unwrap()
         .iter()
         .any(|result| result["path"] == "src/middleware/auth.ts"));
+}
+
+#[test]
+fn git_aware_context_scopes_to_changed_files() {
+    let temp = tempfile::tempdir().unwrap();
+    copy_dir(Path::new("tests/fixtures/nextjs-basic"), temp.path());
+
+    let init = Command::new(bin())
+        .arg("init")
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        init.status.success(),
+        "{}",
+        String::from_utf8_lossy(&init.stderr)
+    );
+
+    run_git(temp.path(), &["init", "-b", "main"]);
+    run_git(
+        temp.path(),
+        &["config", "user.email", "scoutpack@example.com"],
+    );
+    run_git(temp.path(), &["config", "user.name", "ScoutPack Test"]);
+    run_git(temp.path(), &["add", "."]);
+    run_git(temp.path(), &["commit", "-m", "base"]);
+    run_git(temp.path(), &["checkout", "-b", "feature/auth"]);
+
+    fs::write(
+        temp.path().join("src/lib/session.ts"),
+        "export function getSession() {\n  return { user: 'demo' };\n}\n\nexport function clearSession() {\n  return null;\n}\n",
+    )
+    .unwrap();
+    fs::write(
+        temp.path().join("src/lib/review.ts"),
+        "export function reviewAuthChange() {\n  return 'review';\n}\n",
+    )
+    .unwrap();
+    run_git(temp.path(), &["add", "."]);
+    run_git(temp.path(), &["commit", "-m", "change auth files"]);
+
+    let pack = Command::new(bin())
+        .args(["pack", "."])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        pack.status.success(),
+        "{}",
+        String::from_utf8_lossy(&pack.stderr)
+    );
+
+    for args in [
+        vec!["context", "review my PR", "--branch", "--budget", "3000"],
+        vec![
+            "context",
+            "review auth changes",
+            "--diff",
+            "main..HEAD",
+            "--budget",
+            "3000",
+        ],
+        vec![
+            "context",
+            "continue auth work",
+            "--since",
+            "main",
+            "--budget",
+            "3000",
+        ],
+    ] {
+        let context = Command::new(bin())
+            .args(args)
+            .current_dir(temp.path())
+            .output()
+            .unwrap();
+        assert!(
+            context.status.success(),
+            "{}",
+            String::from_utf8_lossy(&context.stderr)
+        );
+        let out = String::from_utf8_lossy(&context.stdout);
+        assert!(out.contains("Recent Changes:"), "{out}");
+        assert!(out.contains("src/lib/session.ts"), "{out}");
+        assert!(out.contains("src/lib/review.ts"), "{out}");
+        assert!(out.contains("+"), "{out}");
+    }
+
+    let mut mcp = Command::new(bin())
+        .args(["mcp", "."])
+        .current_dir(temp.path())
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    {
+        let stdin = mcp.stdin.as_mut().unwrap();
+        writeln!(
+            stdin,
+            r#"{{"jsonrpc":"2.0","id":1,"method":"initialize","params":{{"protocolVersion":"2025-11-25","capabilities":{{}},"clientInfo":{{"name":"integration-test","version":"0.0.0"}}}}}}"#
+        )
+        .unwrap();
+        writeln!(
+            stdin,
+            r#"{{"jsonrpc":"2.0","method":"notifications/initialized","params":{{}}}}"#
+        )
+        .unwrap();
+        writeln!(
+            stdin,
+            r#"{{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{{"name":"recent_changes","arguments":{{"diff":"main..HEAD"}}}}}}"#
+        )
+        .unwrap();
+    }
+    drop(mcp.stdin.take());
+    let mcp_output = mcp.wait_with_output().unwrap();
+    assert!(
+        mcp_output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&mcp_output.stderr)
+    );
+    let mcp_stdout = String::from_utf8_lossy(&mcp_output.stdout);
+    let messages: Vec<serde_json::Value> = mcp_stdout
+        .lines()
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect();
+    let recent = messages.iter().find(|message| message["id"] == 2).unwrap()["result"]
+        ["structuredContent"]["recent_changes"]
+        .clone();
+    assert_eq!(recent["base"], "main");
+    assert_eq!(recent["head"], "HEAD");
+    assert!(recent["changes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|change| change["path"] == "src/lib/session.ts"));
 }
 
 #[test]

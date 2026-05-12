@@ -54,8 +54,17 @@ async fn main() -> Result<()> {
             budget,
             format,
             json,
+            since,
+            diff,
+            branch,
         } => {
-            let packet = context::build_context_packet(".", &task, budget)?;
+            let git_mode = context_git_mode(since, diff, branch)?;
+            let packet = context::build_context_packet_with_options(
+                ".",
+                &task,
+                budget,
+                context::ContextOptions { git_mode },
+            )?;
             let format = if json { ContextFormat::Json } else { format };
             match format {
                 ContextFormat::Markdown => print!("{packet}"),
@@ -82,6 +91,36 @@ async fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+fn context_git_mode(
+    since: Option<String>,
+    diff: Option<String>,
+    branch: bool,
+) -> Result<Option<git::GitContextMode>> {
+    let selected = since.is_some() as u8 + diff.is_some() as u8 + branch as u8;
+    if selected > 1 {
+        anyhow::bail!("Use only one of `--since`, `--diff`, or `--branch`.");
+    }
+    if let Some(since) = since {
+        return Ok(Some(git::GitContextMode::Since(since)));
+    }
+    if let Some(diff) = diff {
+        let Some((base, head)) = diff.split_once("..") else {
+            anyhow::bail!("`--diff` must use `<base>..<head>`, for example `main..HEAD`.");
+        };
+        if base.is_empty() || head.is_empty() {
+            anyhow::bail!("`--diff` must use `<base>..<head>`, for example `main..HEAD`.");
+        }
+        return Ok(Some(git::GitContextMode::Diff {
+            base: base.to_owned(),
+            head: head.to_owned(),
+        }));
+    }
+    if branch {
+        return Ok(Some(git::GitContextMode::Branch));
+    }
+    Ok(None)
 }
 
 fn init_tracing(verbose: u8) {

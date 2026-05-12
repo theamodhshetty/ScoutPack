@@ -109,7 +109,7 @@ This is budget math, not a benchmark claim: if an agent would otherwise read bro
 | Smart scan | Respects `.gitignore`, `.scoutpackignore`, binary limits, and sensitive skips |
 | Code structure | TypeScript/TSX symbols, route handlers, imports, Markdown sections, config chunks |
 | Task context | Token-budgeted packet with relevant files, snippets, commands, and risks |
-| MCP server | Read-only `search`, `context`, `file_summary`, `symbol`, `commands`, `stats` tools |
+| MCP server | Read-only `search`, `context`, `file_summary`, `symbol`, `commands`, `recent_changes`, `stats` tools |
 | Automation output | JSON mode for wrappers and scripts |
 
 ## Search Terms
@@ -226,6 +226,7 @@ Available tools:
 | `file_summary` | indexed file metadata, symbols, and chunk ranges |
 | `symbol` | exact or partial symbol matches |
 | `commands` | discovered package scripts without running them |
+| `recent_changes` | local git diff summary for branch, diff, or since ranges |
 | `stats` | index counts and manifest details |
 
 Full setup: [docs/mcp.md](docs/mcp.md).
@@ -303,6 +304,14 @@ scoutpack context "fix login redirect loop" --budget 2500
 Builds a markdown packet for an AI coding task.
 
 ```bash
+scoutpack context "review my PR" --branch
+scoutpack context "review auth changes" --diff main..HEAD
+scoutpack context "continue indexing work" --since HEAD~5
+```
+
+Adds a Recent Changes section and prioritizes changed files from the local git range.
+
+```bash
 scoutpack context "fix login redirect loop" --budget 2500 --json
 ```
 
@@ -330,7 +339,7 @@ Returns index stats and manifest data as JSON.
 scoutpack mcp .
 ```
 
-Starts a read-only MCP server over the existing local index. Tools include `search`, `context`, `file_summary`, `symbol`, `commands`, and `stats`.
+Starts a read-only MCP server over the existing local index. Tools include `search`, `context`, `file_summary`, `symbol`, `commands`, `recent_changes`, and `stats`.
 
 ```bash
 scoutpack completions zsh > _scoutpack

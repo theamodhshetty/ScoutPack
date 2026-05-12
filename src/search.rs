@@ -135,6 +135,28 @@ pub fn enrich_with_import_neighbors(
     Ok(neighbors)
 }
 
+pub fn chunks_for_paths(
+    root: &Path,
+    paths: &[String],
+    show_snippets: bool,
+) -> Result<Vec<SearchResult>> {
+    if paths.is_empty() {
+        return Ok(Vec::new());
+    }
+    let conn = index::ensure_index(root)?;
+    let mut results = Vec::new();
+    for path in paths {
+        if let Some(result) = best_chunk_for_path(&conn, path, show_snippets)? {
+            results.push(SearchResult {
+                score: result.score + 2.0,
+                reason: "included from git diff".to_owned(),
+                ..result
+            });
+        }
+    }
+    Ok(results)
+}
+
 pub fn query_terms(query: &str) -> Vec<String> {
     query
         .split(|ch: char| !ch.is_ascii_alphanumeric() && ch != '_')

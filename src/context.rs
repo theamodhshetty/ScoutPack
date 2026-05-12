@@ -1,11 +1,26 @@
-use crate::{index, search, token_budget};
+use crate::{git, index, search, token_budget};
 use anyhow::Result;
+use std::collections::HashSet;
 use std::path::Path;
+
+#[derive(Debug, Clone, Default)]
+pub struct ContextOptions {
+    pub git_mode: Option<git::GitContextMode>,
+}
 
 pub fn build_context_packet(
     root: impl AsRef<Path>,
     task: &str,
     budget: Option<usize>,
+) -> Result<String> {
+    build_context_packet_with_options(root, task, budget, ContextOptions::default())
+}
+
+pub fn build_context_packet_with_options(
+    root: impl AsRef<Path>,
+    task: &str,
+    budget: Option<usize>,
+    options: ContextOptions,
 ) -> Result<String> {
     let root = root.as_ref();
     let config = crate::config::load(root)?;
@@ -14,6 +29,7 @@ pub fn build_context_packet(
     let mut results = search::search_repo(root, task, 12, true)?;
     let neighbors = search::enrich_with_import_neighbors(root, &results, 4, true)?;
     merge_results(&mut results, neighbors);
+    let recent_changes = apply_git_context(root, options.git_mode.as_ref(), &mut results)?;
     let commands = index::read_commands(&conn)?;
     let frameworks = index::framework_signals(&conn)?;
 
@@ -34,6 +50,28 @@ pub fn build_context_packet(
     } else {
         for (path, reason) in files {
             prefix.push_str(&format!("- `{path}`: {reason}\n"));
+        }
+    }
+
+    if let Some(recent_changes) = &recent_changes {
+        prefix.push_str("\nRecent Changes:\n");
+        prefix.push_str(&format!(
+            "- Range: `{}`..`{}`\n",
+            recent_changes.base, recent_changes.head
+        ));
+        prefix.push_str(&format!(
+            "- Summary: {} files changed, +{} -{}\n",
+            recent_changes.files_changed, recent_changes.insertions, recent_changes.deletions
+        ));
+        if recent_changes.changes.is_empty() {
+            prefix.push_str("- No changed files in range\n");
+        } else {
+            for change in recent_changes.changes.iter().take(20) {
+                prefix.push_str(&format!(
+                    "- `{}`: {}, +{} -{}\n",
+                    change.path, change.status, change.additions, change.deletions
+                ));
+            }
         }
     }
 
@@ -93,6 +131,42 @@ pub fn build_context_packet(
             "{prefix}\nRelevant Snippets:\n- Budget exhausted before snippets.\n{suffix}"
         ))
     }
+}
+
+fn apply_git_context(
+    root: &Path,
+    mode: Option<&git::GitContextMode>,
+    results: &mut Vec<search::SearchResult>,
+) -> Result<Option<git::RecentChanges>> {
+    let Some(mode) = mode else {
+        return Ok(None);
+    };
+    let recent = git::recent_changes(root, mode)?;
+    let changed_paths: Vec<String> = recent
+        .changes
+        .iter()
+        .filter(|change| change.status != "deleted")
+        .map(|change| change.path.clone())
+        .collect();
+    let changed: HashSet<_> = changed_paths.iter().cloned().collect();
+    let guaranteed = search::chunks_for_paths(root, &changed_paths, true)?;
+
+    match mode {
+        git::GitContextMode::Since(_) => {
+            for result in results.iter_mut() {
+                if changed.contains(&result.path) {
+                    result.score *= 1.5;
+                    result.reason = format!("changed in git range; {}", result.reason);
+                }
+            }
+            merge_results(results, guaranteed);
+        }
+        git::GitContextMode::Diff { .. } | git::GitContextMode::Branch => {
+            results.retain(|result| changed.contains(&result.path));
+            merge_results(results, guaranteed);
+        }
+    }
+    Ok(Some(recent))
 }
 
 fn required_tail(

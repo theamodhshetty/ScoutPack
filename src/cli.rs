@@ -54,6 +54,18 @@ pub enum Commands {
 
         #[arg(long, default_value_t = false)]
         json: bool,
+
+        /// Boost files changed since this git ref.
+        #[arg(long)]
+        since: Option<String>,
+
+        /// Scope context to files changed in a git diff range, for example main..HEAD.
+        #[arg(long)]
+        diff: Option<String>,
+
+        /// Scope context to files changed on the current branch against main.
+        #[arg(long, default_value_t = false)]
+        branch: bool,
     },
 
     /// Show index stats.
