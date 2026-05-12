@@ -10,6 +10,7 @@ All notable ScoutPack changes are tracked here.
 - Python and Go config expansion for `pyproject.toml`, `requirements.txt`, `Pipfile`, `setup.cfg`, and `go.mod` commands/framework signals.
 - Git-aware context flags: `--since`, `--diff`, and `--branch`, plus MCP `recent_changes`.
 - Criterion benchmark coverage and real-repo benchmark script/results for cold indexing, incremental indexing, packet reduction, and search latency.
+- `scoutpack watch` mode for debounced local index refreshes during active development.
 - Machine-readable JSON output for `search`, `context`, and `stats`.
 - Context output formats: markdown, JSON, and XML.
 - Python and Rust symbol/import extraction.

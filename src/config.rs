@@ -10,6 +10,8 @@ pub const DEFAULT_IGNORE_FILE: &str = ".scoutpackignore";
 pub struct ScoutpackConfig {
     pub max_file_size_kb: u64,
     pub default_budget: usize,
+    #[serde(default)]
+    pub watch_mode: bool,
     pub languages: LanguageConfig,
     pub ranking: RankingConfig,
 }
@@ -50,6 +52,7 @@ impl Default for ScoutpackConfig {
         Self {
             max_file_size_kb: 512,
             default_budget: 3000,
+            watch_mode: false,
             languages: LanguageConfig {
                 javascript: true,
                 typescript: true,
@@ -127,6 +130,7 @@ mod tests {
     fn default_config_is_valid_toml() {
         let parsed: ScoutpackConfig = toml::from_str(&default_config_text()).unwrap();
         assert_eq!(parsed.max_file_size_kb, 512);
+        assert!(!parsed.watch_mode);
         assert!(parsed.languages.javascript);
         assert!(parsed.languages.typescript);
         assert!(parsed.languages.python);
@@ -156,6 +160,7 @@ symbol_match_boost = 0.35
 "#,
         )
         .unwrap();
+        assert!(!parsed.watch_mode);
         assert!(parsed.languages.python);
         assert!(parsed.languages.rust);
         assert!(parsed.languages.go);

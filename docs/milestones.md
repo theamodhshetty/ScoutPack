@@ -122,4 +122,5 @@ ScoutPack development stays milestone-driven. Each major milestone should end wi
 - Python and Go config command/framework extraction
 - Git-aware context with `--since`, `--diff`, `--branch`, and MCP `recent_changes`
 - Criterion benchmarks and reproducible real-repo benchmark results
+- Watch mode with debounced incremental re-pack output
 - monorepo workspace summaries

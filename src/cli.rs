@@ -28,6 +28,15 @@ pub enum Commands {
         path: PathBuf,
     },
 
+    /// Watch a repo/folder and refresh the local index after file changes.
+    Watch {
+        #[arg(default_value = ".")]
+        path: PathBuf,
+
+        #[arg(long, default_value_t = 500)]
+        debounce_ms: u64,
+    },
+
     /// Search the local ScoutPack index.
     Search {
         query: String,
