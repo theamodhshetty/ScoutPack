@@ -424,3 +424,89 @@ fn javascript_fixture_indexes_symbols_and_routes() {
         "{component_out}"
     );
 }
+
+#[test]
+fn python_and_go_config_fixtures_emit_commands_and_frameworks() {
+    let python_temp = tempfile::tempdir().unwrap();
+    copy_dir(
+        Path::new("tests/fixtures/fastapi-config"),
+        python_temp.path(),
+    );
+
+    let init = Command::new(bin())
+        .arg("init")
+        .current_dir(python_temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        init.status.success(),
+        "{}",
+        String::from_utf8_lossy(&init.stderr)
+    );
+    let pack = Command::new(bin())
+        .args(["pack", "."])
+        .current_dir(python_temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        pack.status.success(),
+        "{}",
+        String::from_utf8_lossy(&pack.stderr)
+    );
+
+    let python_context = Command::new(bin())
+        .args(["context", "fix login validation", "--budget", "2500"])
+        .current_dir(python_temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        python_context.status.success(),
+        "{}",
+        String::from_utf8_lossy(&python_context.stderr)
+    );
+    let python_out = String::from_utf8_lossy(&python_context.stdout);
+    assert!(python_out.contains("FastAPI"), "{python_out}");
+    assert!(python_out.contains("Pydantic"), "{python_out}");
+    assert!(python_out.contains("pytest"), "{python_out}");
+    assert!(python_out.contains("ruff check ."), "{python_out}");
+
+    let go_temp = tempfile::tempdir().unwrap();
+    copy_dir(Path::new("tests/fixtures/go-config"), go_temp.path());
+
+    let init = Command::new(bin())
+        .arg("init")
+        .current_dir(go_temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        init.status.success(),
+        "{}",
+        String::from_utf8_lossy(&init.stderr)
+    );
+    let pack = Command::new(bin())
+        .args(["pack", "."])
+        .current_dir(go_temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        pack.status.success(),
+        "{}",
+        String::from_utf8_lossy(&pack.stderr)
+    );
+
+    let go_context = Command::new(bin())
+        .args(["context", "fix login route", "--budget", "2500"])
+        .current_dir(go_temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        go_context.status.success(),
+        "{}",
+        String::from_utf8_lossy(&go_context.stderr)
+    );
+    let go_out = String::from_utf8_lossy(&go_context.stdout);
+    assert!(go_out.contains("Gin"), "{go_out}");
+    assert!(go_out.contains("Chi"), "{go_out}");
+    assert!(go_out.contains("go test ./..."), "{go_out}");
+    assert!(go_out.contains("go build ./..."), "{go_out}");
+}

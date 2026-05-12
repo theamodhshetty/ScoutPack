@@ -1,0 +1,7 @@
+[packages]
+fastapi = "*"
+pydantic = "*"
+
+[dev-packages]
+pytest = "*"
+ruff = "*"

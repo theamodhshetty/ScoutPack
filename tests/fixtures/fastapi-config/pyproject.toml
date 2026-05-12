@@ -1,0 +1,13 @@
+[project]
+name = "fastapi-config-fixture"
+version = "0.1.0"
+dependencies = [
+  "fastapi>=0.110",
+  "pydantic>=2",
+  "pytest>=8",
+  "ruff>=0.5"
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

@@ -41,6 +41,29 @@ pub struct ChunkedFile {
 }
 
 pub fn chunk_file(path: &str, language: &str, text: &str) -> ChunkedFile {
+    if path.ends_with("pyproject.toml") {
+        return chunk_pyproject(path, text);
+    }
+    if path.ends_with("requirements.txt") {
+        return chunk_requirements(path, text);
+    }
+    if Path::new(path)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| name == "Pipfile")
+    {
+        return chunk_pipfile(path, text);
+    }
+    if path.ends_with("setup.cfg") {
+        return chunk_setup_cfg(path, text);
+    }
+    if path.ends_with("setup.py") {
+        return chunk_setup_py(path, text);
+    }
+    if path.ends_with("go.mod") {
+        return chunk_go_mod(path, text);
+    }
+
     match language {
         "markdown" => chunk_markdown(text),
         "json" => chunk_json(path, text),
@@ -166,6 +189,501 @@ fn chunk_json(path: &str, text: &str) -> ChunkedFile {
         commands,
         ..ChunkedFile::default()
     }
+}
+
+fn chunk_pyproject(path: &str, text: &str) -> ChunkedFile {
+    let Ok(value) = toml::from_str::<toml::Value>(text) else {
+        return chunk_config(path, text);
+    };
+    let dependencies = pyproject_dependencies(&value);
+    let mut chunks = Vec::new();
+    let mut commands = python_commands(path, &dependencies, text);
+
+    if !dependencies.is_empty() {
+        chunks.push(config_chunk(
+            "python-dependencies",
+            "dependencies",
+            text,
+            dependencies.join("\n"),
+        ));
+    }
+
+    if has_toml_path(&value, &["tool", "pytest"])
+        || has_toml_path(&value, &["tool", "pytest", "ini_options"])
+    {
+        push_command_once(&mut commands, "test", "pytest", path);
+    }
+    if has_toml_path(&value, &["tool", "ruff"]) {
+        push_command_once(&mut commands, "lint", "ruff check .", path);
+    }
+    if has_toml_path(&value, &["tool", "mypy"]) {
+        push_command_once(&mut commands, "typecheck", "mypy .", path);
+    }
+    if has_toml_path(&value, &["build-system"]) {
+        push_command_once(&mut commands, "build", "python -m build", path);
+    }
+
+    let framework_text = python_frameworks(&dependencies, text).join("\n");
+    if !framework_text.is_empty() {
+        chunks.push(config_chunk(
+            "python-config",
+            "frameworks",
+            text,
+            framework_text,
+        ));
+    }
+
+    if chunks.is_empty() {
+        chunks = chunk_config(path, text).chunks;
+    }
+    ChunkedFile {
+        chunks,
+        commands,
+        ..ChunkedFile::default()
+    }
+}
+
+fn chunk_requirements(path: &str, text: &str) -> ChunkedFile {
+    let dependencies = requirements_dependencies(text);
+    let mut chunks = Vec::new();
+    if !dependencies.is_empty() {
+        chunks.push(config_chunk(
+            "python-dependencies",
+            "requirements",
+            text,
+            dependencies.join("\n"),
+        ));
+    }
+    let framework_text = python_frameworks(&dependencies, text).join("\n");
+    if !framework_text.is_empty() {
+        chunks.push(config_chunk(
+            "python-config",
+            "frameworks",
+            text,
+            framework_text,
+        ));
+    }
+    if chunks.is_empty() {
+        chunks = chunk_config(path, text).chunks;
+    }
+    ChunkedFile {
+        chunks,
+        commands: python_commands(path, &dependencies, text),
+        ..ChunkedFile::default()
+    }
+}
+
+fn chunk_pipfile(path: &str, text: &str) -> ChunkedFile {
+    let Ok(value) = toml::from_str::<toml::Value>(text) else {
+        return chunk_config(path, text);
+    };
+    let mut dependencies = Vec::new();
+    for section in ["packages", "dev-packages"] {
+        if let Some(table) = value.get(section).and_then(toml::Value::as_table) {
+            dependencies.extend(table.keys().cloned());
+        }
+    }
+    dependencies.sort();
+    dependencies.dedup();
+    let mut chunks = Vec::new();
+    if !dependencies.is_empty() {
+        chunks.push(config_chunk(
+            "python-dependencies",
+            "pipfile",
+            text,
+            dependencies.join("\n"),
+        ));
+    }
+    let framework_text = python_frameworks(&dependencies, text).join("\n");
+    if !framework_text.is_empty() {
+        chunks.push(config_chunk(
+            "python-config",
+            "frameworks",
+            text,
+            framework_text,
+        ));
+    }
+    if chunks.is_empty() {
+        chunks = chunk_config(path, text).chunks;
+    }
+    ChunkedFile {
+        chunks,
+        commands: python_commands(path, &dependencies, text),
+        ..ChunkedFile::default()
+    }
+}
+
+fn chunk_setup_cfg(path: &str, text: &str) -> ChunkedFile {
+    let dependencies = setup_cfg_dependencies(text);
+    let mut chunks = Vec::new();
+    if !dependencies.is_empty() {
+        chunks.push(config_chunk(
+            "python-dependencies",
+            "setup.cfg",
+            text,
+            dependencies.join("\n"),
+        ));
+    }
+    let framework_text = python_frameworks(&dependencies, text).join("\n");
+    if !framework_text.is_empty() {
+        chunks.push(config_chunk(
+            "python-config",
+            "frameworks",
+            text,
+            framework_text,
+        ));
+    }
+    if chunks.is_empty() {
+        chunks = chunk_config(path, text).chunks;
+    }
+    ChunkedFile {
+        chunks,
+        commands: python_commands(path, &dependencies, text),
+        ..ChunkedFile::default()
+    }
+}
+
+fn chunk_setup_py(path: &str, text: &str) -> ChunkedFile {
+    let dependencies = python_quoted_dependencies(text);
+    let mut chunks = Vec::new();
+    if !dependencies.is_empty() {
+        chunks.push(config_chunk(
+            "python-dependencies",
+            "setup.py",
+            text,
+            dependencies.join("\n"),
+        ));
+    }
+    if chunks.is_empty() {
+        chunks = chunk_python(path, text).chunks;
+    }
+    ChunkedFile {
+        chunks,
+        commands: python_commands(path, &dependencies, text),
+        ..ChunkedFile::default()
+    }
+}
+
+fn chunk_go_mod(path: &str, text: &str) -> ChunkedFile {
+    let module = text.lines().find_map(|line| {
+        line.trim()
+            .strip_prefix("module ")
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(ToOwned::to_owned)
+    });
+    let go_version = text.lines().find_map(|line| {
+        line.trim()
+            .strip_prefix("go ")
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(ToOwned::to_owned)
+    });
+    let dependencies = go_mod_dependencies(text);
+    let mut chunks = Vec::new();
+    if let Some(module) = &module {
+        chunks.push(config_chunk("go-module", "module", text, module.clone()));
+    }
+    if let Some(go_version) = &go_version {
+        chunks.push(config_chunk(
+            "go-module",
+            "go-version",
+            text,
+            go_version.clone(),
+        ));
+    }
+    if !dependencies.is_empty() {
+        chunks.push(config_chunk(
+            "go-dependencies",
+            "requires",
+            text,
+            dependencies.join("\n"),
+        ));
+    }
+    let mut frameworks = vec!["language: go".to_owned()];
+    frameworks.extend(go_frameworks(&dependencies));
+    let framework_text = frameworks.join("\n");
+    if !framework_text.is_empty() {
+        chunks.push(config_chunk(
+            "go-module",
+            "frameworks",
+            text,
+            framework_text,
+        ));
+    }
+    if chunks.is_empty() {
+        chunks = chunk_config(path, text).chunks;
+    }
+    let mut commands = vec![
+        CommandInfo {
+            name: "test".to_owned(),
+            command: "go test ./...".to_owned(),
+            source: path.to_owned(),
+        },
+        CommandInfo {
+            name: "build".to_owned(),
+            command: "go build ./...".to_owned(),
+            source: path.to_owned(),
+        },
+    ];
+    if dependencies
+        .iter()
+        .any(|dependency| dependency.contains("golangci-lint"))
+    {
+        push_command_once(&mut commands, "lint", "golangci-lint run", path);
+    }
+    ChunkedFile {
+        chunks,
+        commands,
+        ..ChunkedFile::default()
+    }
+}
+
+fn config_chunk(kind: &str, name: &str, source_text: &str, text: String) -> Chunk {
+    Chunk {
+        kind: kind.to_owned(),
+        name: Some(name.to_owned()),
+        start_line: 1,
+        end_line: source_text.lines().count().max(1),
+        text,
+    }
+}
+
+fn pyproject_dependencies(value: &toml::Value) -> Vec<String> {
+    let mut dependencies = Vec::new();
+    if let Some(project) = value.get("project") {
+        if let Some(items) = project.get("dependencies").and_then(toml::Value::as_array) {
+            dependencies.extend(items.iter().filter_map(toml::Value::as_str).map(dep_name));
+        }
+        if let Some(optional) = project
+            .get("optional-dependencies")
+            .and_then(toml::Value::as_table)
+        {
+            for items in optional.values().filter_map(toml::Value::as_array) {
+                dependencies.extend(items.iter().filter_map(toml::Value::as_str).map(dep_name));
+            }
+        }
+    }
+    if let Some(poetry) = value.get("tool").and_then(|tool| tool.get("poetry")) {
+        if let Some(table) = poetry.get("dependencies").and_then(toml::Value::as_table) {
+            dependencies.extend(
+                table
+                    .keys()
+                    .filter(|name| name.as_str() != "python")
+                    .cloned(),
+            );
+        }
+        if let Some(groups) = poetry.get("group").and_then(toml::Value::as_table) {
+            for group in groups.values() {
+                if let Some(table) = group.get("dependencies").and_then(toml::Value::as_table) {
+                    dependencies.extend(table.keys().cloned());
+                }
+            }
+        }
+    }
+    if let Some(build_requires) = value
+        .get("build-system")
+        .and_then(|build| build.get("requires"))
+        .and_then(toml::Value::as_array)
+    {
+        dependencies.extend(
+            build_requires
+                .iter()
+                .filter_map(toml::Value::as_str)
+                .map(dep_name),
+        );
+    }
+    dependencies.sort();
+    dependencies.dedup();
+    dependencies
+}
+
+fn requirements_dependencies(text: &str) -> Vec<String> {
+    let mut dependencies = Vec::new();
+    for line in text.lines() {
+        let line = line.split('#').next().unwrap_or("").trim();
+        if line.is_empty()
+            || line.starts_with('-')
+            || line.starts_with("--")
+            || line.starts_with("http://")
+            || line.starts_with("https://")
+        {
+            continue;
+        }
+        dependencies.push(dep_name(line));
+    }
+    dependencies.sort();
+    dependencies.dedup();
+    dependencies
+}
+
+fn setup_cfg_dependencies(text: &str) -> Vec<String> {
+    let mut dependencies = Vec::new();
+    for line in text.lines() {
+        let is_indented = line.starts_with(' ') || line.starts_with('\t');
+        let trimmed = line.trim();
+        if trimmed.is_empty()
+            || trimmed.starts_with('[')
+            || trimmed.starts_with('#')
+            || (!is_indented && trimmed.contains('='))
+        {
+            continue;
+        }
+        let name = dep_name(trimmed);
+        if !name.is_empty() && name.chars().any(|ch| ch.is_ascii_alphabetic()) {
+            dependencies.push(name);
+        }
+    }
+    dependencies.sort();
+    dependencies.dedup();
+    dependencies
+}
+
+fn python_quoted_dependencies(text: &str) -> Vec<String> {
+    let mut dependencies: Vec<_> = quoted_strings(text)
+        .into_iter()
+        .filter(|item| {
+            let lower = item.to_ascii_lowercase();
+            [
+                "fastapi", "django", "flask", "pydantic", "pytest", "ruff", "mypy",
+            ]
+            .iter()
+            .any(|name| lower.contains(name))
+        })
+        .map(|item| dep_name(&item))
+        .collect();
+    dependencies.sort();
+    dependencies.dedup();
+    dependencies
+}
+
+fn dep_name(raw: &str) -> String {
+    raw.trim()
+        .trim_matches('"')
+        .trim_matches('\'')
+        .split(|ch: char| !(ch.is_ascii_alphanumeric() || ch == '_' || ch == '-' || ch == '.'))
+        .next()
+        .unwrap_or("")
+        .to_ascii_lowercase()
+}
+
+fn python_commands(path: &str, dependencies: &[String], text: &str) -> Vec<CommandInfo> {
+    let mut commands = Vec::new();
+    let lower_text = text.to_ascii_lowercase();
+    let has = |needle: &str| {
+        dependencies
+            .iter()
+            .any(|dependency| dependency == needle || dependency.starts_with(&format!("{needle}-")))
+            || lower_text.contains(needle)
+    };
+    if has("pytest") {
+        push_command_once(&mut commands, "test", "pytest", path);
+    }
+    if has("ruff") {
+        push_command_once(&mut commands, "lint", "ruff check .", path);
+    } else if has("flake8") {
+        push_command_once(&mut commands, "lint", "flake8", path);
+    }
+    if has("mypy") {
+        push_command_once(&mut commands, "typecheck", "mypy .", path);
+    }
+    commands
+}
+
+fn python_frameworks(dependencies: &[String], text: &str) -> Vec<String> {
+    framework_matches(
+        dependencies
+            .iter()
+            .map(String::as_str)
+            .chain(std::iter::once(text)),
+        &[
+            ("fastapi", "FastAPI"),
+            ("django", "Django"),
+            ("flask", "Flask"),
+            ("pydantic", "Pydantic"),
+            ("pytest", "Pytest"),
+        ],
+    )
+}
+
+fn go_mod_dependencies(text: &str) -> Vec<String> {
+    let mut dependencies = Vec::new();
+    let mut in_require_block = false;
+    for line in text.lines() {
+        let trimmed = line.split("//").next().unwrap_or("").trim();
+        if trimmed == "require (" {
+            in_require_block = true;
+            continue;
+        }
+        if in_require_block && trimmed == ")" {
+            in_require_block = false;
+            continue;
+        }
+        let dep = if in_require_block {
+            trimmed.split_whitespace().next()
+        } else {
+            trimmed
+                .strip_prefix("require ")
+                .and_then(|rest| rest.split_whitespace().next())
+        };
+        if let Some(dep) = dep.filter(|dep| dep.contains('/')) {
+            dependencies.push(dep.to_owned());
+        }
+    }
+    dependencies.sort();
+    dependencies.dedup();
+    dependencies
+}
+
+fn go_frameworks(dependencies: &[String]) -> Vec<String> {
+    framework_matches(
+        dependencies.iter().map(String::as_str),
+        &[
+            ("github.com/gin-gonic/gin", "Gin"),
+            ("github.com/labstack/echo", "Echo"),
+            ("github.com/gofiber/fiber", "Fiber"),
+            ("github.com/go-chi/chi", "Chi"),
+            ("google.golang.org/grpc", "gRPC"),
+        ],
+    )
+}
+
+fn framework_matches<'a>(
+    haystacks: impl IntoIterator<Item = &'a str>,
+    needles: &[(&str, &str)],
+) -> Vec<String> {
+    let mut signals = Vec::new();
+    for haystack in haystacks {
+        let haystack = haystack.to_ascii_lowercase();
+        for (needle, name) in needles {
+            if haystack.contains(needle) && !signals.iter().any(|signal| signal == name) {
+                signals.push((*name).to_owned());
+            }
+        }
+    }
+    signals
+}
+
+fn has_toml_path(value: &toml::Value, path: &[&str]) -> bool {
+    let mut current = value;
+    for segment in path {
+        let Some(next) = current.get(*segment) else {
+            return false;
+        };
+        current = next;
+    }
+    true
+}
+
+fn push_command_once(commands: &mut Vec<CommandInfo>, name: &str, command: &str, source: &str) {
+    if commands.iter().any(|existing| existing.name == name) {
+        return;
+    }
+    commands.push(CommandInfo {
+        name: name.to_owned(),
+        command: command.to_owned(),
+        source: source.to_owned(),
+    });
 }
 
 fn chunk_typescript(path: &str, text: &str) -> ChunkedFile {
@@ -1240,6 +1758,164 @@ mod tests {
             .chunks
             .iter()
             .any(|chunk| chunk.kind == "package-scripts"));
+    }
+
+    #[test]
+    fn pyproject_extracts_frameworks_and_commands_from_project_metadata() {
+        let text = r#"
+[project]
+dependencies = ["fastapi>=0.110", "pydantic>=2", "pytest"]
+
+[build-system]
+requires = ["hatchling"]
+
+[tool.ruff]
+line-length = 100
+"#;
+        let chunked = chunk_file("pyproject.toml", "python", text);
+        assert!(chunked
+            .chunks
+            .iter()
+            .any(|chunk| chunk.kind == "python-dependencies" && chunk.text.contains("fastapi")));
+        assert!(chunked
+            .chunks
+            .iter()
+            .any(|chunk| chunk.kind == "python-config" && chunk.text.contains("FastAPI")));
+        assert!(chunked
+            .commands
+            .iter()
+            .any(|command| command.name == "test" && command.command == "pytest"));
+        assert!(chunked
+            .commands
+            .iter()
+            .any(|command| command.name == "lint" && command.command == "ruff check ."));
+        assert!(chunked
+            .commands
+            .iter()
+            .any(|command| command.name == "build" && command.command == "python -m build"));
+    }
+
+    #[test]
+    fn pyproject_extracts_poetry_group_dependencies() {
+        let text = r#"
+[tool.poetry.dependencies]
+python = "^3.11"
+django = "^5"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8"
+mypy = "^1"
+"#;
+        let chunked = chunk_file("pyproject.toml", "python", text);
+        let dependency_text = chunked
+            .chunks
+            .iter()
+            .find(|chunk| chunk.kind == "python-dependencies")
+            .map(|chunk| chunk.text.as_str())
+            .unwrap_or("");
+        assert!(dependency_text.contains("django"));
+        assert!(dependency_text.contains("pytest"));
+        assert!(chunked
+            .commands
+            .iter()
+            .any(|command| command.name == "typecheck" && command.command == "mypy ."));
+    }
+
+    #[test]
+    fn requirements_extracts_python_dependencies_and_commands() {
+        let text = "fastapi==0.110.0\npydantic>=2\npytest\nruff # lint\n";
+        let chunked = chunk_file("requirements.txt", "python", text);
+        assert!(chunked
+            .chunks
+            .iter()
+            .any(|chunk| chunk.kind == "python-dependencies" && chunk.text.contains("fastapi")));
+        assert!(chunked
+            .commands
+            .iter()
+            .any(|command| command.name == "test" && command.command == "pytest"));
+        assert!(chunked
+            .commands
+            .iter()
+            .any(|command| command.name == "lint" && command.command == "ruff check ."));
+    }
+
+    #[test]
+    fn pipfile_extracts_packages_and_dev_commands() {
+        let text = r#"
+[packages]
+flask = "*"
+pydantic = "*"
+
+[dev-packages]
+pytest = "*"
+"#;
+        let chunked = chunk_file("Pipfile", "python", text);
+        let dependency_text = chunked
+            .chunks
+            .iter()
+            .find(|chunk| chunk.kind == "python-dependencies")
+            .map(|chunk| chunk.text.as_str())
+            .unwrap_or("");
+        assert!(dependency_text.contains("flask"));
+        assert!(dependency_text.contains("pytest"));
+        assert!(chunked
+            .commands
+            .iter()
+            .any(|command| command.name == "test" && command.command == "pytest"));
+    }
+
+    #[test]
+    fn setup_cfg_extracts_dependencies_and_tools() {
+        let text = r#"
+[options]
+install_requires =
+    django>=5
+    pydantic>=2
+
+[tool:pytest]
+testpaths = tests
+
+[flake8]
+max-line-length = 100
+"#;
+        let chunked = chunk_file("setup.cfg", "python", text);
+        let dependency_text = chunked
+            .chunks
+            .iter()
+            .find(|chunk| chunk.kind == "python-dependencies")
+            .map(|chunk| chunk.text.as_str())
+            .unwrap_or("");
+        assert!(dependency_text.contains("django"));
+        assert!(chunked
+            .commands
+            .iter()
+            .any(|command| command.name == "test" && command.command == "pytest"));
+        assert!(chunked
+            .commands
+            .iter()
+            .any(|command| command.name == "lint" && command.command == "flake8"));
+    }
+
+    #[test]
+    fn go_mod_extracts_module_dependencies_and_commands() {
+        let text = "module github.com/acme/api\n\ngo 1.22\n\nrequire (\n    github.com/gin-gonic/gin v1.10.0\n    google.golang.org/grpc v1.64.0\n)\n";
+        let chunked = chunk_file("go.mod", "go", text);
+        assert!(chunked
+            .chunks
+            .iter()
+            .any(|chunk| chunk.kind == "go-module" && chunk.text.contains("github.com/acme/api")));
+        assert!(chunked
+            .chunks
+            .iter()
+            .any(|chunk| chunk.kind == "go-dependencies" && chunk.text.contains("gin-gonic")));
+        assert!(chunked
+            .commands
+            .iter()
+            .any(|command| command.name == "test" && command.command == "go test ./..."));
+        assert!(chunked
+            .commands
+            .iter()
+            .any(|command| command.name == "build" && command.command == "go build ./..."));
     }
 
     #[test]

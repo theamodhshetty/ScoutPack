@@ -180,6 +180,16 @@ pub fn scan_repo(root: &Path, config: &ScoutpackConfig) -> Result<ScanResult> {
 
 pub fn classify_path(path: &Path) -> Option<(String, String)> {
     let file_name = path.file_name()?.to_string_lossy();
+    match file_name.as_ref() {
+        "pyproject.toml" | "setup.cfg" | "setup.py" => {
+            return Some(("python".to_owned(), "project-config".to_owned()));
+        }
+        "requirements.txt" | "Pipfile" => {
+            return Some(("python".to_owned(), "dependency-config".to_owned()));
+        }
+        "go.mod" => return Some(("go".to_owned(), "module-config".to_owned())),
+        _ => {}
+    }
     let ext = path.extension().and_then(|ext| ext.to_str()).unwrap_or("");
     match ext {
         "js" | "mjs" | "cjs" | "jsx" => Some(("javascript".to_owned(), js_kind(path))),
@@ -500,6 +510,22 @@ mod tests {
             ("python".to_owned(), "test".to_owned())
         );
         assert_eq!(
+            classify_path(Path::new("pyproject.toml")).unwrap(),
+            ("python".to_owned(), "project-config".to_owned())
+        );
+        assert_eq!(
+            classify_path(Path::new("requirements.txt")).unwrap(),
+            ("python".to_owned(), "dependency-config".to_owned())
+        );
+        assert_eq!(
+            classify_path(Path::new("Pipfile")).unwrap(),
+            ("python".to_owned(), "dependency-config".to_owned())
+        );
+        assert_eq!(
+            classify_path(Path::new("setup.cfg")).unwrap(),
+            ("python".to_owned(), "project-config".to_owned())
+        );
+        assert_eq!(
             classify_path(Path::new("src/main.rs")).unwrap(),
             ("rust".to_owned(), "binary-entry".to_owned())
         );
@@ -510,6 +536,10 @@ mod tests {
         assert_eq!(
             classify_path(Path::new("internal/api/user.go")).unwrap(),
             ("go".to_owned(), "source".to_owned())
+        );
+        assert_eq!(
+            classify_path(Path::new("go.mod")).unwrap(),
+            ("go".to_owned(), "module-config".to_owned())
         );
         assert_eq!(
             classify_path(Path::new("internal/api/user_test.go")).unwrap(),

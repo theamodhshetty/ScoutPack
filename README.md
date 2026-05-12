@@ -344,9 +344,9 @@ Generates shell completions for `bash`, `zsh`, `fish`, `powershell`, or `elvish`
 | --- | --- |
 | JavaScript / JSX | tree-sitter symbols, imports, CommonJS requires, functions, classes, components, route handlers |
 | TypeScript / TSX | tree-sitter symbols, imports, functions, components, route handlers |
-| Python | tree-sitter functions, classes, imports, FastAPI-style route decorators |
+| Python | tree-sitter functions, classes, imports, FastAPI-style route decorators, `pyproject.toml`, `requirements.txt`, `Pipfile`, `setup.cfg` |
 | Rust | tree-sitter functions, structs, enums, traits, impl blocks, modules, use imports |
-| Go | tree-sitter packages, imports, functions, methods, structs, interfaces |
+| Go | tree-sitter packages, imports, functions, methods, structs, interfaces, `go.mod` |
 | Solidity | tree-sitter contracts, interfaces, libraries, functions, modifiers, events, imports |
 | Markdown | heading-based sections |
 | JSON | package scripts, dependencies, framework signals |
