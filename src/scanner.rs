@@ -183,11 +183,45 @@ pub fn classify_path(path: &Path) -> Option<(String, String)> {
     let ext = path.extension().and_then(|ext| ext.to_str()).unwrap_or("");
     match ext {
         "ts" | "tsx" => Some(("typescript".to_owned(), ts_kind(path))),
+        "py" => Some(("python".to_owned(), python_kind(path))),
+        "rs" => Some(("rust".to_owned(), rust_kind(path))),
         "md" | "mdx" => Some(("markdown".to_owned(), "doc".to_owned())),
         "json" => Some(("json".to_owned(), json_kind(&file_name))),
         "yaml" | "yml" => Some(("yaml".to_owned(), "config".to_owned())),
         "toml" => Some(("toml".to_owned(), "config".to_owned())),
         _ => None,
+    }
+}
+
+fn python_kind(path: &Path) -> String {
+    let file_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("");
+    if file_name == "__init__.py" {
+        "module-init".to_owned()
+    } else if file_name.starts_with("test_") || file_name.ends_with("_test.py") {
+        "test".to_owned()
+    } else {
+        "source".to_owned()
+    }
+}
+
+fn rust_kind(path: &Path) -> String {
+    let file_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("");
+    if file_name == "main.rs" {
+        "binary-entry".to_owned()
+    } else if file_name == "lib.rs" {
+        "library-entry".to_owned()
+    } else if path.components().any(|component| {
+        matches!(component, Component::Normal(part) if part.to_string_lossy() == "tests")
+    }) {
+        "test".to_owned()
+    } else {
+        "source".to_owned()
     }
 }
 
@@ -216,6 +250,8 @@ fn json_kind(file_name: &str) -> String {
 fn language_enabled(language: &str, config: &ScoutpackConfig) -> bool {
     match language {
         "typescript" => config.languages.typescript,
+        "python" => config.languages.python,
+        "rust" => config.languages.rust,
         "markdown" => config.languages.markdown,
         "json" => config.languages.json,
         "yaml" => config.languages.yaml,
@@ -396,5 +432,25 @@ mod tests {
             .files
             .iter()
             .any(|file| file.rel_path.contains("generated.ts")));
+    }
+
+    #[test]
+    fn python_and_rust_files_are_classified() {
+        assert_eq!(
+            classify_path(Path::new("app/api/users.py")).unwrap(),
+            ("python".to_owned(), "source".to_owned())
+        );
+        assert_eq!(
+            classify_path(Path::new("tests/test_users.py")).unwrap(),
+            ("python".to_owned(), "test".to_owned())
+        );
+        assert_eq!(
+            classify_path(Path::new("src/main.rs")).unwrap(),
+            ("rust".to_owned(), "binary-entry".to_owned())
+        );
+        assert_eq!(
+            classify_path(Path::new("src/lib.rs")).unwrap(),
+            ("rust".to_owned(), "library-entry".to_owned())
+        );
     }
 }

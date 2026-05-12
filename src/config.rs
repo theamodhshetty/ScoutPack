@@ -16,10 +16,19 @@ pub struct ScoutpackConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LanguageConfig {
+    #[serde(default = "default_true")]
     pub typescript: bool,
+    #[serde(default = "default_true")]
+    pub python: bool,
+    #[serde(default = "default_true")]
+    pub rust: bool,
+    #[serde(default = "default_true")]
     pub markdown: bool,
+    #[serde(default = "default_true")]
     pub json: bool,
+    #[serde(default = "default_true")]
     pub yaml: bool,
+    #[serde(default = "default_true")]
     pub toml: bool,
 }
 
@@ -37,6 +46,8 @@ impl Default for ScoutpackConfig {
             default_budget: 3000,
             languages: LanguageConfig {
                 typescript: true,
+                python: true,
+                rust: true,
                 markdown: true,
                 json: true,
                 yaml: true,
@@ -95,6 +106,10 @@ pub fn default_ignore_text() -> &'static str {
     ".git\n.scoutpack\nnode_modules\n.next\ndist\nbuild\ncoverage\n.turbo\n.cache\ntarget\n.venv\nvendor\n"
 }
 
+fn default_true() -> bool {
+    true
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -104,5 +119,32 @@ mod tests {
         let parsed: ScoutpackConfig = toml::from_str(&default_config_text()).unwrap();
         assert_eq!(parsed.max_file_size_kb, 512);
         assert!(parsed.languages.typescript);
+        assert!(parsed.languages.python);
+        assert!(parsed.languages.rust);
+    }
+
+    #[test]
+    fn old_language_config_defaults_new_languages_on() {
+        let parsed: ScoutpackConfig = toml::from_str(
+            r#"
+max_file_size_kb = 512
+default_budget = 3000
+
+[languages]
+typescript = true
+markdown = true
+json = true
+yaml = true
+toml = true
+
+[ranking]
+recent_file_boost = 0.15
+path_match_boost = 0.25
+symbol_match_boost = 0.35
+"#,
+        )
+        .unwrap();
+        assert!(parsed.languages.python);
+        assert!(parsed.languages.rust);
     }
 }

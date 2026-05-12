@@ -44,6 +44,8 @@ pub fn chunk_file(path: &str, language: &str, text: &str) -> ChunkedFile {
         "markdown" => chunk_markdown(text),
         "json" => chunk_json(path, text),
         "typescript" => chunk_typescript(path, text),
+        "python" => chunk_python(path, text),
+        "rust" => chunk_rust(path, text),
         "yaml" | "toml" => chunk_config(path, text),
         _ => fallback_file_chunk(path, text),
     }
@@ -291,6 +293,244 @@ fn chunk_typescript_heuristic(path: &str, text: &str) -> ChunkedFile {
         imports,
         ..ChunkedFile::default()
     }
+}
+
+fn chunk_python(path: &str, text: &str) -> ChunkedFile {
+    let mut parser = Parser::new();
+    if parser
+        .set_language(&tree_sitter_python::LANGUAGE.into())
+        .is_err()
+    {
+        return ChunkedFile {
+            chunks: fallback_line_windows(path, text, 80),
+            ..ChunkedFile::default()
+        };
+    }
+    let Some(tree) = parser.parse(text, None) else {
+        return ChunkedFile {
+            chunks: fallback_line_windows(path, text, 80),
+            ..ChunkedFile::default()
+        };
+    };
+    let root = tree.root_node();
+    if root.has_error() {
+        return ChunkedFile {
+            chunks: fallback_line_windows(path, text, 80),
+            ..ChunkedFile::default()
+        };
+    }
+
+    let mut imports = Vec::new();
+    let mut symbols = Vec::new();
+    let mut chunks = Vec::new();
+    let mut cursor = root.walk();
+    for node in root.named_children(&mut cursor) {
+        match node.kind() {
+            "import_statement" | "import_from_statement" => {
+                if let Some(import) = python_import_from_node(node, text) {
+                    imports.push(import);
+                }
+            }
+            "function_definition" | "class_definition" | "decorated_definition" => {
+                if let Some((chunk_node, kind, name)) = python_symbol_from_node(node, text) {
+                    push_symbol_chunk(&mut symbols, &mut chunks, chunk_node, kind, name, text);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    if chunks.is_empty() {
+        chunks = fallback_line_windows(path, text, 80);
+    }
+    ChunkedFile {
+        chunks,
+        symbols,
+        imports,
+        ..ChunkedFile::default()
+    }
+}
+
+fn python_import_from_node(node: Node<'_>, text: &str) -> Option<Import> {
+    let raw = node_text(node, text);
+    let trimmed = raw.trim();
+    let to_path = if let Some(rest) = trimmed.strip_prefix("from ") {
+        rest.split_whitespace().next().unwrap_or("").to_owned()
+    } else if let Some(rest) = trimmed.strip_prefix("import ") {
+        rest.split(',')
+            .next()
+            .unwrap_or("")
+            .split_whitespace()
+            .next()
+            .unwrap_or("")
+            .to_owned()
+    } else {
+        String::new()
+    };
+    if to_path.is_empty() {
+        None
+    } else {
+        Some(Import {
+            to_path,
+            symbol: None,
+        })
+    }
+}
+
+fn python_symbol_from_node<'a>(node: Node<'a>, text: &str) -> Option<(Node<'a>, String, String)> {
+    let definition = if node.kind() == "decorated_definition" {
+        let mut cursor = node.walk();
+        let definition = node
+            .named_children(&mut cursor)
+            .find(|child| matches!(child.kind(), "function_definition" | "class_definition"))?;
+        definition
+    } else {
+        node
+    };
+    let name = definition
+        .child_by_field_name("name")
+        .map(|name| node_text(name, text))?;
+    let kind = if definition.kind() == "class_definition" {
+        "class"
+    } else if node.kind() == "decorated_definition" && is_python_route(node, text) {
+        "route-handler"
+    } else {
+        "function"
+    };
+    Some((node, kind.to_owned(), name))
+}
+
+fn is_python_route(node: Node<'_>, text: &str) -> bool {
+    node_text(node, text).lines().take(8).any(|line| {
+        let line = line.trim();
+        line.starts_with("@app.")
+            || line.starts_with("@router.")
+            || line.contains(".get(")
+            || line.contains(".post(")
+            || line.contains(".put(")
+            || line.contains(".patch(")
+            || line.contains(".delete(")
+    })
+}
+
+fn chunk_rust(path: &str, text: &str) -> ChunkedFile {
+    let mut parser = Parser::new();
+    if parser
+        .set_language(&tree_sitter_rust::LANGUAGE.into())
+        .is_err()
+    {
+        return ChunkedFile {
+            chunks: fallback_line_windows(path, text, 80),
+            ..ChunkedFile::default()
+        };
+    }
+    let Some(tree) = parser.parse(text, None) else {
+        return ChunkedFile {
+            chunks: fallback_line_windows(path, text, 80),
+            ..ChunkedFile::default()
+        };
+    };
+    let root = tree.root_node();
+    if root.has_error() {
+        return ChunkedFile {
+            chunks: fallback_line_windows(path, text, 80),
+            ..ChunkedFile::default()
+        };
+    }
+
+    let mut imports = Vec::new();
+    let mut symbols = Vec::new();
+    let mut chunks = Vec::new();
+    let mut cursor = root.walk();
+    for node in root.named_children(&mut cursor) {
+        match node.kind() {
+            "use_declaration" => {
+                if let Some(import) = rust_import_from_node(node, text) {
+                    imports.push(import);
+                }
+            }
+            "function_item" | "struct_item" | "enum_item" | "trait_item" | "impl_item"
+            | "mod_item" => {
+                if let Some((kind, name)) = rust_symbol_from_node(node, text) {
+                    push_symbol_chunk(&mut symbols, &mut chunks, node, kind, name, text);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    if chunks.is_empty() {
+        chunks = fallback_line_windows(path, text, 80);
+    }
+    ChunkedFile {
+        chunks,
+        symbols,
+        imports,
+        ..ChunkedFile::default()
+    }
+}
+
+fn rust_import_from_node(node: Node<'_>, text: &str) -> Option<Import> {
+    let to_path = node_text(node, text)
+        .trim()
+        .trim_start_matches("use")
+        .trim()
+        .trim_end_matches(';')
+        .to_owned();
+    if to_path.is_empty() {
+        None
+    } else {
+        Some(Import {
+            to_path,
+            symbol: None,
+        })
+    }
+}
+
+fn rust_symbol_from_node(node: Node<'_>, text: &str) -> Option<(String, String)> {
+    let kind = match node.kind() {
+        "function_item" => "function",
+        "struct_item" => "struct",
+        "enum_item" => "enum",
+        "trait_item" => "trait",
+        "impl_item" => "impl",
+        "mod_item" => "module",
+        _ => return None,
+    };
+    let name = if node.kind() == "impl_item" {
+        let type_node = find_descendant_by_kind(node, "type_identifier")
+            .or_else(|| find_descendant_by_kind(node, "generic_type"))?;
+        format!("impl {}", node_text(type_node, text))
+    } else {
+        node.child_by_field_name("name")
+            .map(|name| node_text(name, text))?
+    };
+    Some((kind.to_owned(), name))
+}
+
+fn push_symbol_chunk(
+    symbols: &mut Vec<Symbol>,
+    chunks: &mut Vec<Chunk>,
+    node: Node<'_>,
+    kind: String,
+    name: String,
+    text: &str,
+) {
+    let start_line = node.start_position().row + 1;
+    let end_line = node.end_position().row + 1;
+    symbols.push(Symbol {
+        name: name.clone(),
+        kind: kind.clone(),
+        start_line,
+        end_line,
+    });
+    chunks.push(Chunk {
+        kind,
+        name: Some(name),
+        start_line,
+        end_line,
+        text: node_text(node, text),
+    });
 }
 
 fn import_from_node(node: Node<'_>, text: &str) -> Option<Import> {
@@ -621,5 +861,48 @@ mod tests {
         let chunked = chunk_file("src/app/api/health/route.ts", "typescript", text);
         assert_eq!(chunked.symbols[0].name, "GET");
         assert_eq!(chunked.symbols[0].kind, "route-handler");
+    }
+
+    #[test]
+    fn python_extracts_functions_classes_routes_and_imports() {
+        let text = "from fastapi import APIRouter\nimport services.auth\n\nrouter = APIRouter()\n\nclass UserService:\n    pass\n\n@router.get('/users/{user_id}')\ndef get_user(user_id: str):\n    return {'id': user_id}\n\ndef helper():\n    return None\n";
+        let chunked = chunk_file("app/api/users.py", "python", text);
+        let symbols: Vec<_> = chunked
+            .symbols
+            .iter()
+            .map(|symbol| (symbol.kind.as_str(), symbol.name.as_str()))
+            .collect();
+        assert!(chunked
+            .imports
+            .iter()
+            .any(|import| import.to_path == "fastapi"));
+        assert!(chunked
+            .imports
+            .iter()
+            .any(|import| import.to_path == "services.auth"));
+        assert!(symbols.contains(&("class", "UserService")));
+        assert!(symbols.contains(&("route-handler", "get_user")));
+        assert!(symbols.contains(&("function", "helper")));
+    }
+
+    #[test]
+    fn rust_extracts_items_impls_modules_and_imports() {
+        let text = "use crate::config::Config;\n\npub mod commands;\n\npub struct Cli {\n    name: String,\n}\n\npub enum Mode {\n    Fast,\n}\n\npub trait Runnable {\n    fn run(&self);\n}\n\nimpl Cli {\n    pub fn new() -> Self {\n        Self { name: String::new() }\n    }\n}\n\npub fn execute() {}\n";
+        let chunked = chunk_file("src/main.rs", "rust", text);
+        let symbols: Vec<_> = chunked
+            .symbols
+            .iter()
+            .map(|symbol| (symbol.kind.as_str(), symbol.name.as_str()))
+            .collect();
+        assert!(chunked
+            .imports
+            .iter()
+            .any(|import| import.to_path == "crate::config::Config"));
+        assert!(symbols.contains(&("module", "commands")));
+        assert!(symbols.contains(&("struct", "Cli")));
+        assert!(symbols.contains(&("enum", "Mode")));
+        assert!(symbols.contains(&("trait", "Runnable")));
+        assert!(symbols.contains(&("impl", "impl Cli")));
+        assert!(symbols.contains(&("function", "execute")));
     }
 }

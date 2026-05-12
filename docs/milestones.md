@@ -113,7 +113,8 @@ ScoutPack development stays milestone-driven. Each major milestone should end wi
 
 ### M11: Index Coverage
 
-- Python and Go chunking
+- Python chunking and symbol extraction
 - Rust symbol extraction
+- Go chunking
 - lockfile/package manager detection
 - monorepo workspace summaries
