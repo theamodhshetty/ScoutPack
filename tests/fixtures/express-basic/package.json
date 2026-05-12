@@ -1,0 +1,9 @@
+{
+  "scripts": {
+    "test": "node --test",
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.0"
+  }
+}

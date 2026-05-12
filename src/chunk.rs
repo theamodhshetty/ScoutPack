@@ -1,4 +1,5 @@
 use serde_json::Value;
+use std::path::Path;
 use tree_sitter::{Node, Parser};
 
 #[derive(Debug, Clone)]
@@ -43,6 +44,7 @@ pub fn chunk_file(path: &str, language: &str, text: &str) -> ChunkedFile {
     match language {
         "markdown" => chunk_markdown(text),
         "json" => chunk_json(path, text),
+        "javascript" => chunk_javascript(path, text),
         "typescript" => chunk_typescript(path, text),
         "python" => chunk_python(path, text),
         "rust" => chunk_rust(path, text),
@@ -169,6 +171,196 @@ fn chunk_json(path: &str, text: &str) -> ChunkedFile {
 fn chunk_typescript(path: &str, text: &str) -> ChunkedFile {
     chunk_typescript_tree_sitter(path, text)
         .unwrap_or_else(|| chunk_typescript_heuristic(path, text))
+}
+
+fn chunk_javascript(path: &str, text: &str) -> ChunkedFile {
+    chunk_javascript_tree_sitter(path, text)
+        .unwrap_or_else(|| chunk_typescript_heuristic(path, text))
+}
+
+fn chunk_javascript_tree_sitter(path: &str, text: &str) -> Option<ChunkedFile> {
+    let mut parser = Parser::new();
+    parser
+        .set_language(&tree_sitter_javascript::LANGUAGE.into())
+        .ok()?;
+    let tree = parser.parse(text, None)?;
+    let root = tree.root_node();
+    if root.has_error() {
+        return None;
+    }
+
+    let mut imports = commonjs_imports(text);
+    let mut symbols = Vec::new();
+    let mut chunks = Vec::new();
+    let mut cursor = root.walk();
+
+    for node in root.named_children(&mut cursor) {
+        if node.kind() == "import_statement" {
+            if let Some(import) = import_from_node(node, text) {
+                imports.push(import);
+            }
+            continue;
+        }
+
+        if let Some((kind, name)) = javascript_route_call(node, text) {
+            push_symbol_chunk(&mut symbols, &mut chunks, node, kind, name, text);
+            continue;
+        }
+
+        let Some((chunk_node, declaration_node, kind, name)) =
+            javascript_declaration_from_node(node, path, text)
+        else {
+            continue;
+        };
+        push_symbol_chunk(&mut symbols, &mut chunks, chunk_node, kind, name, text);
+
+        if declaration_node.kind() == "lexical_declaration"
+            || declaration_node.kind() == "variable_declaration"
+        {
+            continue;
+        }
+    }
+
+    imports.sort_by(|a, b| a.to_path.cmp(&b.to_path));
+    imports.dedup_by(|a, b| a.to_path == b.to_path && a.symbol == b.symbol);
+
+    if symbols.is_empty() {
+        return Some(ChunkedFile {
+            chunks: fallback_line_windows(path, text, 80),
+            imports,
+            ..ChunkedFile::default()
+        });
+    }
+
+    Some(ChunkedFile {
+        chunks,
+        symbols,
+        imports,
+        ..ChunkedFile::default()
+    })
+}
+
+fn javascript_declaration_from_node<'a>(
+    node: Node<'a>,
+    path: &str,
+    text: &str,
+) -> Option<(Node<'a>, Node<'a>, String, String)> {
+    let declaration = if node.kind() == "export_statement" {
+        node.child_by_field_name("declaration")
+            .or_else(|| first_javascript_declaration_child(node))?
+    } else {
+        node
+    };
+
+    let name = javascript_declaration_name(declaration, text)?;
+    let kind = javascript_declaration_kind(path, declaration, &name)?;
+    Some((node, declaration, kind, name))
+}
+
+fn first_javascript_declaration_child(node: Node<'_>) -> Option<Node<'_>> {
+    let mut cursor = node.walk();
+    let declaration = node.named_children(&mut cursor).find(|child| {
+        matches!(
+            child.kind(),
+            "function_declaration"
+                | "generator_function_declaration"
+                | "class_declaration"
+                | "lexical_declaration"
+                | "variable_declaration"
+        )
+    });
+    declaration
+}
+
+fn javascript_declaration_name(node: Node<'_>, text: &str) -> Option<String> {
+    if matches!(node.kind(), "lexical_declaration" | "variable_declaration") {
+        let declarator = find_descendant_by_kind(node, "variable_declarator")?;
+        let name = declarator.child_by_field_name("name")?;
+        return Some(node_text(name, text));
+    }
+
+    node.child_by_field_name("name")
+        .map(|name| node_text(name, text))
+}
+
+fn javascript_declaration_kind(path: &str, node: Node<'_>, name: &str) -> Option<String> {
+    let base_kind = match node.kind() {
+        "function_declaration" | "generator_function_declaration" => "function",
+        "class_declaration" => "class",
+        "lexical_declaration" | "variable_declaration" => {
+            if find_descendant_by_kind(node, "arrow_function").is_some()
+                || find_descendant_by_kind(node, "function_expression").is_some()
+            {
+                "function"
+            } else {
+                "value"
+            }
+        }
+        _ => return None,
+    };
+
+    let kind = if is_javascript_route_path(path) && HTTP_METHODS.contains(&name) {
+        "route-handler"
+    } else if name
+        .chars()
+        .next()
+        .is_some_and(|ch| ch.is_ascii_uppercase())
+        && matches!(base_kind, "function" | "value")
+        && (path.ends_with(".jsx")
+            || find_descendant_by_kind(node, "jsx_element").is_some()
+            || find_descendant_by_kind(node, "jsx_self_closing_element").is_some())
+    {
+        "component"
+    } else {
+        base_kind
+    };
+    Some(kind.to_owned())
+}
+
+const HTTP_METHODS: &[&str] = &["GET", "POST", "PUT", "PATCH", "DELETE"];
+
+fn is_javascript_route_path(path: &str) -> bool {
+    matches!(
+        Path::new(path).file_name().and_then(|name| name.to_str()),
+        Some("route.js" | "route.jsx" | "route.mjs" | "route.cjs")
+    )
+}
+
+fn javascript_route_call(node: Node<'_>, text: &str) -> Option<(String, String)> {
+    if node.kind() != "expression_statement" {
+        return None;
+    }
+    let raw = node_text(node, text);
+    let method = [
+        ("get", "GET"),
+        ("post", "POST"),
+        ("put", "PUT"),
+        ("patch", "PATCH"),
+        ("delete", "DELETE"),
+    ]
+    .iter()
+    .find_map(|(needle, label)| (raw.contains(&format!(".{needle}("))).then_some(*label))?;
+    let route = quoted_strings(&raw)
+        .into_iter()
+        .next()
+        .unwrap_or_else(|| "unknown".to_owned());
+    Some(("route-handler".to_owned(), format!("{method} {route}")))
+}
+
+fn commonjs_imports(text: &str) -> Vec<Import> {
+    let mut imports = Vec::new();
+    for line in text.lines() {
+        if !line.contains("require(") {
+            continue;
+        }
+        for import in quoted_strings(line) {
+            imports.push(Import {
+                to_path: import,
+                symbol: None,
+            });
+        }
+    }
+    imports
 }
 
 fn chunk_typescript_tree_sitter(path: &str, text: &str) -> Option<ChunkedFile> {
@@ -1048,6 +1240,43 @@ mod tests {
             .chunks
             .iter()
             .any(|chunk| chunk.kind == "package-scripts"));
+    }
+
+    #[test]
+    fn javascript_extracts_esm_commonjs_functions_classes_and_components() {
+        let text = "import express from 'express';\nconst bcrypt = require('bcryptjs');\n\nexport class AuthService {}\nexport function requireAuth(req, res, next) {\n  next();\n}\nexport const loginUser = async (req, res) => {\n  return res.json({ ok: true });\n};\nexport const LoginButton = () => <button>Login</button>;\n";
+        let chunked = chunk_file("src/server.jsx", "javascript", text);
+        let symbols: Vec<_> = chunked
+            .symbols
+            .iter()
+            .map(|symbol| (symbol.kind.as_str(), symbol.name.as_str()))
+            .collect();
+        assert!(chunked
+            .imports
+            .iter()
+            .any(|import| import.to_path == "express"));
+        assert!(chunked
+            .imports
+            .iter()
+            .any(|import| import.to_path == "bcryptjs"));
+        assert!(symbols.contains(&("class", "AuthService")));
+        assert!(symbols.contains(&("function", "requireAuth")));
+        assert!(symbols.contains(&("function", "loginUser")));
+        assert!(symbols.contains(&("component", "LoginButton")));
+    }
+
+    #[test]
+    fn javascript_extracts_express_route_handlers() {
+        let text = "const express = require('express');\nconst app = express();\n\nfunction requireAuth(req, res, next) {\n  next();\n}\n\napp.get('/auth/session', requireAuth);\napp.post('/login', (req, res) => res.sendStatus(204));\n";
+        let chunked = chunk_file("src/server.js", "javascript", text);
+        let symbols: Vec<_> = chunked
+            .symbols
+            .iter()
+            .map(|symbol| (symbol.kind.as_str(), symbol.name.as_str()))
+            .collect();
+        assert!(symbols.contains(&("function", "requireAuth")));
+        assert!(symbols.contains(&("route-handler", "GET /auth/session")));
+        assert!(symbols.contains(&("route-handler", "POST /login")));
     }
 
     #[test]

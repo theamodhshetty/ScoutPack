@@ -113,6 +113,7 @@ ScoutPack development stays milestone-driven. Each major milestone should end wi
 
 ### M11: Index Coverage
 
+- JavaScript and JSX chunking and symbol extraction
 - Python chunking and symbol extraction
 - Rust symbol extraction
 - Go chunking and symbol extraction

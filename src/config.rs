@@ -17,6 +17,8 @@ pub struct ScoutpackConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LanguageConfig {
     #[serde(default = "default_true")]
+    pub javascript: bool,
+    #[serde(default = "default_true")]
     pub typescript: bool,
     #[serde(default = "default_true")]
     pub python: bool,
@@ -49,6 +51,7 @@ impl Default for ScoutpackConfig {
             max_file_size_kb: 512,
             default_budget: 3000,
             languages: LanguageConfig {
+                javascript: true,
                 typescript: true,
                 python: true,
                 rust: true,
@@ -124,6 +127,7 @@ mod tests {
     fn default_config_is_valid_toml() {
         let parsed: ScoutpackConfig = toml::from_str(&default_config_text()).unwrap();
         assert_eq!(parsed.max_file_size_kb, 512);
+        assert!(parsed.languages.javascript);
         assert!(parsed.languages.typescript);
         assert!(parsed.languages.python);
         assert!(parsed.languages.rust);
@@ -156,5 +160,6 @@ symbol_match_boost = 0.35
         assert!(parsed.languages.rust);
         assert!(parsed.languages.go);
         assert!(parsed.languages.solidity);
+        assert!(parsed.languages.javascript);
     }
 }

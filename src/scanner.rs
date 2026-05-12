@@ -182,6 +182,7 @@ pub fn classify_path(path: &Path) -> Option<(String, String)> {
     let file_name = path.file_name()?.to_string_lossy();
     let ext = path.extension().and_then(|ext| ext.to_str()).unwrap_or("");
     match ext {
+        "js" | "mjs" | "cjs" | "jsx" => Some(("javascript".to_owned(), js_kind(path))),
         "ts" | "tsx" => Some(("typescript".to_owned(), ts_kind(path))),
         "py" => Some(("python".to_owned(), python_kind(path))),
         "rs" => Some(("rust".to_owned(), rust_kind(path))),
@@ -192,6 +193,27 @@ pub fn classify_path(path: &Path) -> Option<(String, String)> {
         "yaml" | "yml" => Some(("yaml".to_owned(), "config".to_owned())),
         "toml" => Some(("toml".to_owned(), "config".to_owned())),
         _ => None,
+    }
+}
+
+fn js_kind(path: &Path) -> String {
+    let file_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("");
+    if matches!(
+        file_name,
+        "route.js" | "route.jsx" | "route.mjs" | "route.cjs"
+    ) {
+        "route-handler".to_owned()
+    } else if file_name.ends_with(".test.js")
+        || file_name.ends_with(".spec.js")
+        || file_name.ends_with(".test.jsx")
+        || file_name.ends_with(".spec.jsx")
+    {
+        "test".to_owned()
+    } else {
+        "source".to_owned()
     }
 }
 
@@ -263,6 +285,7 @@ fn json_kind(file_name: &str) -> String {
 
 fn language_enabled(language: &str, config: &ScoutpackConfig) -> bool {
     match language {
+        "javascript" => config.languages.javascript,
         "typescript" => config.languages.typescript,
         "python" => config.languages.python,
         "rust" => config.languages.rust,
@@ -452,6 +475,22 @@ mod tests {
 
     #[test]
     fn python_and_rust_files_are_classified() {
+        assert_eq!(
+            classify_path(Path::new("src/server.js")).unwrap(),
+            ("javascript".to_owned(), "source".to_owned())
+        );
+        assert_eq!(
+            classify_path(Path::new("src/Login.jsx")).unwrap(),
+            ("javascript".to_owned(), "source".to_owned())
+        );
+        assert_eq!(
+            classify_path(Path::new("src/app/api/health/route.js")).unwrap(),
+            ("javascript".to_owned(), "route-handler".to_owned())
+        );
+        assert_eq!(
+            classify_path(Path::new("src/server.test.js")).unwrap(),
+            ("javascript".to_owned(), "test".to_owned())
+        );
         assert_eq!(
             classify_path(Path::new("app/api/users.py")).unwrap(),
             ("python".to_owned(), "source".to_owned())
