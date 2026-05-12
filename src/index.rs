@@ -1,4 +1,4 @@
-use crate::{chunk, config, git, scanner};
+use crate::{chunk, config, git, scanner, semantic};
 use anyhow::{Context, Result};
 use rusqlite::{params, Connection, OptionalExtension, Transaction};
 use serde::{Deserialize, Serialize};
@@ -13,7 +13,13 @@ const INDEX_DIR: &str = ".scoutpack";
 const DB_FILE: &str = "pack.sqlite";
 const MANIFEST_FILE: &str = "manifest.json";
 const REPO_MAP_FILE: &str = "repo-map.md";
-const SCHEMA_VERSION: i64 = 2;
+const SCHEMA_VERSION: i64 = 3;
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct PackOptions {
+    pub embed: bool,
+    pub allow_model_download: bool,
+}
 
 #[derive(Debug)]
 pub struct PackSummary {
@@ -21,6 +27,7 @@ pub struct PackSummary {
     pub files_reused: usize,
     pub files_removed: usize,
     pub chunks_indexed: usize,
+    pub embeddings_indexed: usize,
     pub files_skipped: usize,
     pub index_path: PathBuf,
 }
@@ -46,6 +53,7 @@ pub struct IndexStats {
     pub chunk_count: i64,
     pub symbol_count: i64,
     pub command_count: i64,
+    pub embedding_count: i64,
     pub skipped_count: i64,
     pub index_path: PathBuf,
 }
@@ -106,6 +114,10 @@ pub fn ensure_index(root: &Path) -> Result<Connection> {
 }
 
 pub fn pack_repo(root: &Path) -> Result<PackSummary> {
+    pack_repo_with_options(root, PackOptions::default())
+}
+
+pub fn pack_repo_with_options(root: &Path, options: PackOptions) -> Result<PackSummary> {
     if !root.exists() {
         anyhow::bail!("Path does not exist: {}", root.display());
     }
@@ -172,6 +184,11 @@ pub fn pack_repo(root: &Path) -> Result<PackSummary> {
     }
     tx.commit()?;
     rebuild_fts(&conn)?;
+    let embeddings_indexed = if options.embed {
+        semantic::embed_missing_chunks(&conn, options.allow_model_download)?
+    } else {
+        0
+    };
 
     let manifest = Manifest {
         scoutpack_version: env!("CARGO_PKG_VERSION").to_owned(),
@@ -199,6 +216,7 @@ pub fn pack_repo(root: &Path) -> Result<PackSummary> {
         files_reused,
         files_removed,
         chunks_indexed,
+        embeddings_indexed,
         files_skipped: scan.skipped.len(),
         index_path: db_path,
     })
@@ -216,6 +234,7 @@ pub fn read_stats(root: &Path) -> Result<IndexStats> {
         chunk_count: count(&conn, "chunks")?,
         symbol_count: count(&conn, "symbols")?,
         command_count: count(&conn, "commands")?,
+        embedding_count: count(&conn, "chunk_embeddings")?,
         skipped_count: count(&conn, "skipped_files")?,
         index_path: path,
     })
@@ -491,6 +510,10 @@ fn delete_file(tx: &Transaction<'_>, file_id: i64, path: &str) -> Result<()> {
         params![file_id],
     )?;
     tx.execute("DELETE FROM symbols WHERE file_id = ?1", params![file_id])?;
+    tx.execute(
+        "DELETE FROM chunk_embeddings WHERE chunk_id IN (SELECT id FROM chunks WHERE file_id = ?1)",
+        params![file_id],
+    )?;
     tx.execute("DELETE FROM chunks WHERE file_id = ?1", params![file_id])?;
     tx.execute("DELETE FROM commands WHERE source = ?1", params![path])?;
     tx.execute("DELETE FROM files WHERE id = ?1", params![file_id])?;
@@ -558,6 +581,7 @@ fn recreate_schema(conn: &Connection) -> Result<()> {
         DROP TABLE IF EXISTS chunks_fts;
         DROP TABLE IF EXISTS imports;
         DROP TABLE IF EXISTS symbols;
+        DROP TABLE IF EXISTS chunk_embeddings;
         DROP TABLE IF EXISTS chunks;
         DROP TABLE IF EXISTS commands;
         DROP TABLE IF EXISTS skipped_files;
@@ -590,6 +614,15 @@ fn recreate_schema(conn: &Connection) -> Result<()> {
           end_line INTEGER NOT NULL,
           text TEXT NOT NULL,
           FOREIGN KEY(file_id) REFERENCES files(id)
+        );
+
+        CREATE TABLE chunk_embeddings (
+          chunk_id INTEGER NOT NULL,
+          model TEXT NOT NULL,
+          dim INTEGER NOT NULL,
+          vector BLOB NOT NULL,
+          PRIMARY KEY (chunk_id, model),
+          FOREIGN KEY(chunk_id) REFERENCES chunks(id)
         );
 
         CREATE TABLE symbols (

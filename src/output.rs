@@ -74,6 +74,7 @@ pub fn print_stats(stats: &IndexStats) {
     println!("Chunks: {}", stats.chunk_count);
     println!("Symbols: {}", stats.symbol_count);
     println!("Commands: {}", stats.command_count);
+    println!("Embeddings: {}", stats.embedding_count);
     println!("Skipped: {}", stats.skipped_count);
     if let Some(manifest) = &stats.manifest {
         println!("Version: {}", manifest.scoutpack_version);
@@ -111,6 +112,7 @@ pub fn print_stats_json(stats: &IndexStats) -> Result<()> {
             "chunk_count": stats.chunk_count,
             "symbol_count": stats.symbol_count,
             "command_count": stats.command_count,
+            "embedding_count": stats.embedding_count,
             "skipped_count": stats.skipped_count,
             "manifest": stats.manifest,
         }))?

@@ -9,10 +9,15 @@ readme = "README.md"
 keywords = ["ai", "cli", "context", "search", "offline"]
 categories = ["command-line-utilities", "development-tools"]
 
+[features]
+default = []
+semantic = ["dep:fastembed"]
+
 [dependencies]
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 clap_complete = "4"
+fastembed = { version = "5.13.4", optional = true, default-features = false, features = ["hf-hub-native-tls", "ort-load-dynamic"] }
 git2 = { version = "0.19", default-features = false }
 hex = "0.4"
 ignore = "0.4"

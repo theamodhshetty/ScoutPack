@@ -15,6 +15,20 @@ ScoutPack bundles SQLite through `rusqlite`, so users do not need a separate SQL
 cargo install --git https://github.com/theamodhshetty/ScoutPack.git
 ```
 
+Default installs do not include semantic embedding dependencies.
+
+Optional local semantic search:
+
+```bash
+cargo install --git https://github.com/theamodhshetty/ScoutPack.git --features semantic
+scoutpack pack . --embed
+scoutpack search "login flow" --semantic
+```
+
+First `--embed` use may download `BAAI/bge-small-en-v1.5` to `~/.cache/scoutpack/models` after confirmation. Embeddings remain local in `.scoutpack/pack.sqlite`.
+
+Semantic builds use fastembed with dynamic ONNX Runtime loading so unsupported platform binaries do not break default installs. If your platform does not provide ONNX Runtime automatically, install ONNX Runtime and set the loader path before using `--embed`.
+
 Check install:
 
 ```bash

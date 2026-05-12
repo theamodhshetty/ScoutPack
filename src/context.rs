@@ -3,9 +3,21 @@ use anyhow::Result;
 use std::collections::HashSet;
 use std::path::Path;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct ContextOptions {
     pub git_mode: Option<git::GitContextMode>,
+    pub semantic: bool,
+    pub semantic_alpha: f64,
+}
+
+impl Default for ContextOptions {
+    fn default() -> Self {
+        Self {
+            git_mode: None,
+            semantic: false,
+            semantic_alpha: 0.45,
+        }
+    }
 }
 
 pub fn build_context_packet(
@@ -26,7 +38,16 @@ pub fn build_context_packet_with_options(
     let config = crate::config::load(root)?;
     let budget = budget.unwrap_or(config.default_budget);
     let conn = index::ensure_index(root)?;
-    let mut results = search::search_repo(root, task, 12, true)?;
+    let mut results = search::search_repo_with_options(
+        root,
+        task,
+        12,
+        true,
+        search::SearchOptions {
+            semantic: options.semantic,
+            semantic_alpha: options.semantic_alpha,
+        },
+    )?;
     let neighbors = search::enrich_with_import_neighbors(root, &results, 4, true)?;
     merge_results(&mut results, neighbors);
     let recent_changes = apply_git_context(root, options.git_mode.as_ref(), &mut results)?;

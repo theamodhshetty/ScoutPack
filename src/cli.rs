@@ -26,6 +26,14 @@ pub enum Commands {
     Pack {
         #[arg(default_value = ".")]
         path: PathBuf,
+
+        /// Generate local semantic embeddings for chunks. Requires `--features semantic`.
+        #[arg(long, default_value_t = false)]
+        embed: bool,
+
+        /// Allow one-time local model download for `--embed` without an interactive prompt.
+        #[arg(long, default_value_t = false)]
+        allow_model_download: bool,
     },
 
     /// Watch a repo/folder and refresh the local index after file changes.
@@ -49,6 +57,14 @@ pub enum Commands {
 
         #[arg(long, default_value_t = false)]
         json: bool,
+
+        /// Use local semantic embeddings. Requires an index created with `pack --embed`.
+        #[arg(long, default_value_t = false)]
+        semantic: bool,
+
+        /// Weight for semantic score in hybrid ranking.
+        #[arg(long, default_value_t = 0.45)]
+        semantic_alpha: f64,
     },
 
     /// Build a compact task-specific markdown context packet.
@@ -75,6 +91,14 @@ pub enum Commands {
         /// Scope context to files changed on the current branch against main.
         #[arg(long, default_value_t = false)]
         branch: bool,
+
+        /// Use local semantic embeddings. Requires an index created with `pack --embed`.
+        #[arg(long, default_value_t = false)]
+        semantic: bool,
+
+        /// Weight for semantic score in hybrid ranking.
+        #[arg(long, default_value_t = 0.45)]
+        semantic_alpha: f64,
     },
 
     /// Show index stats.

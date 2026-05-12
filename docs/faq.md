@@ -14,7 +14,9 @@ No. ScoutPack has no cloud calls, no API key, and no telemetry. It writes a loca
 
 ## Is this RAG?
 
-Not in the usual vector-search sense. v0.1 uses SQLite FTS5, tree-sitter symbols, imports, path matches, and deterministic ranking. Local embeddings may come later only if deterministic ranking is not enough.
+By default, no. ScoutPack uses SQLite FTS5, tree-sitter symbols, imports, path matches, and deterministic ranking.
+
+Optional local semantic search is available only when ScoutPack is built with `--features semantic`. It stores per-chunk embeddings in the local SQLite index. First use may download `BAAI/bge-small-en-v1.5` after confirmation; there are still no cloud model APIs or telemetry.
 
 ## Does ScoutPack run package scripts?
 
