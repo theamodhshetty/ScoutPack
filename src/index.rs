@@ -223,8 +223,9 @@ pub fn read_stats(root: &Path) -> Result<IndexStats> {
 
 pub fn read_commands(conn: &Connection) -> Result<Vec<(String, String, String)>> {
     let mut stmt = conn.prepare(
-        "SELECT name, command, source
+        "SELECT name, command, MIN(source) AS source
          FROM commands
+         GROUP BY name, command
          ORDER BY CASE name
            WHEN 'test' THEN 0
            WHEN 'lint' THEN 1
@@ -351,12 +352,21 @@ pub fn find_symbols(conn: &Connection, query: &str, limit: usize) -> Result<Vec<
 }
 
 pub fn framework_signals(conn: &Connection) -> Result<Vec<String>> {
-    let mut stmt =
-        conn.prepare("SELECT text FROM chunks WHERE kind = 'package-dependencies' LIMIT 5")?;
+    let mut stmt = conn.prepare(
+        "SELECT text FROM chunks
+         WHERE kind IN (
+           'package-dependencies',
+           'python-dependencies',
+           'python-config',
+           'go-module',
+           'go-dependencies'
+         )
+         LIMIT 25",
+    )?;
     let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
     let mut signals = Vec::new();
     for row in rows {
-        let text = row?;
+        let text = row?.to_ascii_lowercase();
         for (needle, name) in [
             ("\"next\"", "Next.js"),
             ("\"react\"", "React"),
@@ -364,6 +374,17 @@ pub fn framework_signals(conn: &Connection) -> Result<Vec<String>> {
             ("\"vitest\"", "Vitest"),
             ("\"jest\"", "Jest"),
             ("\"playwright\"", "Playwright"),
+            ("fastapi", "FastAPI"),
+            ("django", "Django"),
+            ("flask", "Flask"),
+            ("pydantic", "Pydantic"),
+            ("pytest", "Pytest"),
+            ("language: go", "Go"),
+            ("github.com/gin-gonic/gin", "Gin"),
+            ("github.com/labstack/echo", "Echo"),
+            ("github.com/gofiber/fiber", "Fiber"),
+            ("github.com/go-chi/chi", "Chi"),
+            ("google.golang.org/grpc", "gRPC"),
         ] {
             if text.contains(needle) && !signals.iter().any(|signal| signal == name) {
                 signals.push(name.to_owned());
