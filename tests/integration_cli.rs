@@ -345,3 +345,82 @@ fn init_pack_search_context_stats_work() {
         .iter()
         .any(|result| result["path"] == "src/middleware/auth.ts"));
 }
+
+#[test]
+fn javascript_fixture_indexes_symbols_and_routes() {
+    let temp = tempfile::tempdir().unwrap();
+    copy_dir(Path::new("tests/fixtures/express-basic"), temp.path());
+
+    let init = Command::new(bin())
+        .arg("init")
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        init.status.success(),
+        "{}",
+        String::from_utf8_lossy(&init.stderr)
+    );
+
+    let pack = Command::new(bin())
+        .arg("pack")
+        .arg(".")
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        pack.status.success(),
+        "{}",
+        String::from_utf8_lossy(&pack.stderr)
+    );
+
+    let auth_search = Command::new(bin())
+        .args(["search", "requireAuth", "--limit", "5"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        auth_search.status.success(),
+        "{}",
+        String::from_utf8_lossy(&auth_search.stderr)
+    );
+    let auth_out = String::from_utf8_lossy(&auth_search.stdout);
+    assert!(auth_out.contains("src/server.js"), "{auth_out}");
+    assert!(auth_out.contains("[function] requireAuth"), "{auth_out}");
+
+    let route_search = Command::new(bin())
+        .args(["search", "auth session", "--limit", "5"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        route_search.status.success(),
+        "{}",
+        String::from_utf8_lossy(&route_search.stderr)
+    );
+    let route_out = String::from_utf8_lossy(&route_search.stdout);
+    assert!(
+        route_out.contains("[route-handler] GET /auth/session"),
+        "{route_out}"
+    );
+
+    let component_search = Command::new(bin())
+        .args(["search", "LoginButton", "--limit", "5"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        component_search.status.success(),
+        "{}",
+        String::from_utf8_lossy(&component_search.stderr)
+    );
+    let component_out = String::from_utf8_lossy(&component_search.stdout);
+    assert!(
+        component_out.contains("src/LoginButton.jsx"),
+        "{component_out}"
+    );
+    assert!(
+        component_out.contains("[component] LoginButton"),
+        "{component_out}"
+    );
+}

@@ -234,7 +234,10 @@ fn score_result(
 
 fn source_file_boost(path: &str) -> f64 {
     let lower = path.to_ascii_lowercase();
-    if lower.ends_with(".ts") || lower.ends_with(".tsx") {
+    if matches!(
+        Path::new(&lower).extension().and_then(|ext| ext.to_str()),
+        Some("ts" | "tsx" | "js" | "jsx" | "mjs" | "cjs")
+    ) {
         1.2
     } else if lower.ends_with("package.json") {
         0.1
@@ -371,9 +374,15 @@ fn resolve_import(
         normalized.clone(),
         format!("{normalized}.ts"),
         format!("{normalized}.tsx"),
+        format!("{normalized}.js"),
+        format!("{normalized}.jsx"),
+        format!("{normalized}.mjs"),
+        format!("{normalized}.cjs"),
         format!("{normalized}.json"),
         format!("{normalized}/index.ts"),
         format!("{normalized}/index.tsx"),
+        format!("{normalized}/index.js"),
+        format!("{normalized}/index.jsx"),
     ];
     candidates
         .into_iter()

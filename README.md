@@ -342,6 +342,7 @@ Generates shell completions for `bash`, `zsh`, `fish`, `powershell`, or `elvish`
 
 | Area | Support |
 | --- | --- |
+| JavaScript / JSX | tree-sitter symbols, imports, CommonJS requires, functions, classes, components, route handlers |
 | TypeScript / TSX | tree-sitter symbols, imports, functions, components, route handlers |
 | Python | tree-sitter functions, classes, imports, FastAPI-style route decorators |
 | Rust | tree-sitter functions, structs, enums, traits, impl blocks, modules, use imports |
