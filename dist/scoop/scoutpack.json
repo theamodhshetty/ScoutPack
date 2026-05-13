@@ -1,0 +1,23 @@
+{
+  "version": "0.1.0",
+  "description": "Offline repo context compiler for AI coding agents.",
+  "homepage": "https://github.com/theamodhshetty/ScoutPack",
+  "license": "MIT",
+  "architecture": {
+    "64bit": {
+      "url": "https://github.com/theamodhshetty/ScoutPack/releases/download/v0.1.0/scoutpack-x86_64-pc-windows-msvc.zip",
+      "hash": "REPLACE_WITH_X86_64_WINDOWS_SHA256"
+    }
+  },
+  "bin": "scoutpack.exe",
+  "checkver": {
+    "github": "https://github.com/theamodhshetty/ScoutPack"
+  },
+  "autoupdate": {
+    "architecture": {
+      "64bit": {
+        "url": "https://github.com/theamodhshetty/ScoutPack/releases/download/v$version/scoutpack-x86_64-pc-windows-msvc.zip"
+      }
+    }
+  }
+}

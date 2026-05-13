@@ -1,0 +1,99 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            archive: tar.gz
+            use_cross: false
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            archive: tar.gz
+            use_cross: true
+          - os: macos-13
+            target: x86_64-apple-darwin
+            archive: tar.gz
+            use_cross: false
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            archive: tar.gz
+            use_cross: false
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            archive: zip
+            use_cross: false
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Build
+        if: matrix.use_cross == false
+        run: cargo build --locked --release --target ${{ matrix.target }}
+
+      - name: Build with cross
+        if: matrix.use_cross == true
+        run: |
+          cargo install cross --locked
+          cross build --locked --release --target ${{ matrix.target }}
+
+      - name: Package Unix
+        if: matrix.archive == 'tar.gz'
+        shell: bash
+        run: |
+          set -euo pipefail
+          staging="scoutpack-${{ matrix.target }}"
+          mkdir -p "$staging"
+          cp "target/${{ matrix.target }}/release/scoutpack" "$staging/"
+          cp README.md LICENSE "$staging/"
+          tar -czf "scoutpack-${{ matrix.target }}.tar.gz" "$staging"
+
+      - name: Package Windows
+        if: matrix.archive == 'zip'
+        shell: pwsh
+        run: |
+          $staging = "scoutpack-${{ matrix.target }}"
+          New-Item -ItemType Directory -Force -Path $staging | Out-Null
+          Copy-Item "target/${{ matrix.target }}/release/scoutpack.exe" "$staging/"
+          Copy-Item README.md,LICENSE "$staging/"
+          Compress-Archive -Path $staging -DestinationPath "scoutpack-${{ matrix.target }}.zip" -Force
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: scoutpack-${{ matrix.target }}
+          path: |
+            scoutpack-${{ matrix.target }}.tar.gz
+            scoutpack-${{ matrix.target }}.zip
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true

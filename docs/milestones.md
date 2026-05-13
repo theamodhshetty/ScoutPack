@@ -124,4 +124,5 @@ ScoutPack development stays milestone-driven. Each major milestone should end wi
 - Criterion benchmarks and reproducible real-repo benchmark results
 - Watch mode with debounced incremental re-pack output
 - Optional local semantic embeddings behind `--features semantic`
+- Release binaries, install script, Homebrew formula template, and Scoop manifest template
 - monorepo workspace summaries

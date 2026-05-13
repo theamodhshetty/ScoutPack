@@ -6,6 +6,11 @@ Use this checklist before tagging a public release.
 
 - `cargo fmt --check`
 - `cargo test`
+- `cargo clippy -- -D warnings`
+- `cargo build --release`
+- `cargo package`
+- `bash -n install.sh`
+- `sh install.sh --help`
 - CLI smoke test on `tests/fixtures/nextjs-basic`
 - `scoutpack --help`
 - `scoutpack init`
@@ -25,8 +30,18 @@ Use this checklist before tagging a public release.
 
 - CI green on `main`
 - open issues reflect next work
-- release tag created
+- release tag created with `v*` format
+- release workflow uploaded macOS, Linux, and Windows assets
 - release notes include breaking changes, if any
+
+## Package Managers
+
+- compute SHA-256 checksums for release archives
+- update `dist/homebrew/scoutpack.rb`
+- test Homebrew formula in tap
+- update `dist/scoop/scoutpack.json`
+- test Scoop manifest on Windows
+- verify `install.sh` downloads latest release
 
 ## Crates.io Later
 
@@ -34,4 +49,3 @@ Use this checklist before tagging a public release.
 - verify license and README render
 - `cargo publish --dry-run`
 - reserve/publish crate name
-
