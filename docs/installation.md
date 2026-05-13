@@ -35,6 +35,37 @@ Check install:
 scoutpack --help
 ```
 
+## Install From Release Binary
+
+macOS/Linux users can install from GitHub Releases without a local Rust toolchain:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/theamodhshetty/ScoutPack/main/install.sh | sh
+```
+
+Install a specific release:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/theamodhshetty/ScoutPack/main/install.sh | sh -s -- --version v0.1.0
+```
+
+Install into a custom directory:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/theamodhshetty/ScoutPack/main/install.sh | sh -s -- --dir "$HOME/.local/bin"
+```
+
+Windows users can install from the release zip or use the Scoop manifest template in `dist/scoop/scoutpack.json` after release hashes are filled.
+
+## Homebrew And Scoop
+
+Prepared templates:
+
+- Homebrew: `dist/homebrew/scoutpack.rb`
+- Scoop: `dist/scoop/scoutpack.json`
+
+After each release, replace placeholder hashes with real SHA-256 checksums. See [distribution](distribution.md).
+
 ## Install From Local Checkout
 
 ```bash

@@ -12,3 +12,5 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo fmt --check
       - run: cargo test
+      - run: bash -n install.sh
+      - run: sh install.sh --help

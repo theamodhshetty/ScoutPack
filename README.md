@@ -132,6 +132,12 @@ From GitHub:
 cargo install --git https://github.com/theamodhshetty/ScoutPack.git
 ```
 
+From a release binary on macOS/Linux:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/theamodhshetty/ScoutPack/main/install.sh | sh
+```
+
 Requirements:
 
 - Rust stable
