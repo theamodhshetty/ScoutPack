@@ -61,6 +61,7 @@ Claude Code project-scoped config can live in `.mcp.json`. VS Code stores worksp
 | --- | --- |
 | `search` | ranked local index search with optional snippets |
 | `context` | token-budgeted task packet |
+| `template` | agent-ready prompt from a named template plus local context |
 | `file_summary` | indexed metadata, symbols, and chunk ranges for one file |
 | `symbol` | exact or partial symbol lookup |
 | `commands` | package commands discovered during indexing, never executed |
@@ -72,6 +73,7 @@ Claude Code project-scoped config can live in `.mcp.json`. VS Code stores worksp
 - Run `scoutpack pack .` again after meaningful repo changes.
 - MCP tools require an existing `.scoutpack/pack.sqlite`.
 - Tool responses include structured JSON plus text content for broad client compatibility.
+- `template` supports built-in templates such as `bugfix`, `refactor`, `review`, `docs`, and `test`.
 - `recent_changes` uses local git metadata only and returns file summaries with line counts, not full diff bodies.
 
 ## Client Docs

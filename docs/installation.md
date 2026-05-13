@@ -144,6 +144,7 @@ scoutpack.toml
 ```bash
 scoutpack search "auth middleware" --json
 scoutpack context "fix login redirect loop" --budget 2500 --json
+scoutpack template bugfix "fix login redirect loop" --budget 2500 --json
 scoutpack stats --json
 ```
 

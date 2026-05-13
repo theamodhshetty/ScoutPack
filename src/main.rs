@@ -9,6 +9,7 @@ mod output;
 mod scanner;
 mod search;
 mod semantic;
+mod templates;
 mod token_budget;
 mod watch;
 
@@ -102,6 +103,33 @@ async fn main() -> Result<()> {
                 ContextFormat::Markdown => print!("{packet}"),
                 ContextFormat::Json => output::print_context_json(&task, budget, &packet)?,
                 ContextFormat::Xml => output::print_context_xml(&task, budget, &packet)?,
+            }
+        }
+        Commands::Template {
+            name,
+            task,
+            budget,
+            json,
+            since,
+            diff,
+            branch,
+        } => {
+            let git_mode = context_git_mode(since, diff, branch)?;
+            let prompt = templates::render_prompt(
+                ".",
+                &name,
+                &task,
+                templates::TemplateOptions { budget, git_mode },
+            )?;
+            if json {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&templates::render_summary(
+                        &task, &prompt, &name, budget
+                    ))?
+                );
+            } else {
+                print!("{prompt}");
             }
         }
         Commands::Stats { path, json } => {

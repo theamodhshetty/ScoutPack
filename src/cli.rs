@@ -101,6 +101,31 @@ pub enum Commands {
         semantic_alpha: f64,
     },
 
+    /// Render an agent-ready prompt from a named template and ScoutPack context.
+    Template {
+        name: String,
+
+        task: String,
+
+        #[arg(short, long)]
+        budget: Option<usize>,
+
+        #[arg(long, default_value_t = false)]
+        json: bool,
+
+        /// Boost files changed since this git ref.
+        #[arg(long)]
+        since: Option<String>,
+
+        /// Scope context to files changed in a git diff range, for example main..HEAD.
+        #[arg(long)]
+        diff: Option<String>,
+
+        /// Scope context to files changed on the current branch against main.
+        #[arg(long, default_value_t = false)]
+        branch: bool,
+    },
+
     /// Show index stats.
     Stats {
         #[arg(default_value = ".")]

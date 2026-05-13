@@ -277,6 +277,62 @@ fn init_pack_search_context_stats_work() {
         "{tiny_context_out}"
     );
 
+    let prompt = Command::new(bin())
+        .args([
+            "template",
+            "bugfix",
+            "fix login redirect loop",
+            "--budget",
+            "2000",
+        ])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        prompt.status.success(),
+        "{}",
+        String::from_utf8_lossy(&prompt.stderr)
+    );
+    let prompt_out = String::from_utf8_lossy(&prompt.stdout);
+    assert!(prompt_out.contains("# Bugfix Prompt"), "{prompt_out}");
+    assert!(
+        prompt_out.contains("fix login redirect loop"),
+        "{prompt_out}"
+    );
+    assert!(prompt_out.contains("# ScoutPack Context"), "{prompt_out}");
+    assert!(prompt_out.contains("Recent changes:"), "{prompt_out}");
+
+    fs::create_dir_all(temp.path().join("scoutpack/templates")).unwrap();
+    fs::write(
+        temp.path().join("scoutpack/templates/custom.md"),
+        "Custom task: {{task}}\n\n{{recent_changes}}\n\n{{context}}\n",
+    )
+    .unwrap();
+    let custom_prompt_json = Command::new(bin())
+        .args([
+            "template",
+            "custom",
+            "fix login redirect loop",
+            "--budget",
+            "2000",
+            "--json",
+        ])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        custom_prompt_json.status.success(),
+        "{}",
+        String::from_utf8_lossy(&custom_prompt_json.stderr)
+    );
+    let custom_prompt_value: serde_json::Value =
+        serde_json::from_slice(&custom_prompt_json.stdout).unwrap();
+    assert_eq!(custom_prompt_value["template"], "custom");
+    assert!(custom_prompt_value["prompt"]
+        .as_str()
+        .unwrap()
+        .contains("Custom task: fix login redirect loop"));
+
     let stats = Command::new(bin())
         .arg("stats")
         .current_dir(temp.path())
@@ -317,6 +373,7 @@ fn init_pack_search_context_stats_work() {
     assert!(completions_out.contains("#compdef scoutpack"));
     assert!(completions_out.contains("completions"));
     assert!(completions_out.contains("watch"));
+    assert!(completions_out.contains("template"));
     assert!(completions_out.contains("semantic"));
 
     let mut mcp = Command::new(bin())
@@ -354,6 +411,11 @@ fn init_pack_search_context_stats_work() {
             r#"{{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{{"name":"search","arguments":{{"query":"auth middleware","limit":3}}}}}}"#
         )
         .unwrap();
+        writeln!(
+            stdin,
+            r#"{{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{{"name":"template","arguments":{{"name":"bugfix","task":"fix login redirect loop","budget":2000}}}}}}"#
+        )
+        .unwrap();
     }
     drop(mcp.stdin.take());
     let mcp_output = mcp.wait_with_output().unwrap();
@@ -371,6 +433,7 @@ fn init_pack_search_context_stats_work() {
         .as_array()
         .unwrap();
     assert!(tools.iter().any(|tool| tool["name"] == "context"));
+    assert!(tools.iter().any(|tool| tool["name"] == "template"));
     assert!(tools.iter().any(|tool| tool["name"] == "file_summary"));
     assert!(tools.iter().any(|tool| tool["name"] == "recent_changes"));
     let mcp_stats = messages.iter().find(|message| message["id"] == 3).unwrap()["result"]
@@ -385,6 +448,14 @@ fn init_pack_search_context_stats_work() {
         .unwrap()
         .iter()
         .any(|result| result["path"] == "src/middleware/auth.ts"));
+    let mcp_template = messages.iter().find(|message| message["id"] == 5).unwrap()["result"]
+        ["structuredContent"]
+        .clone();
+    assert_eq!(mcp_template["template"], "bugfix");
+    assert!(mcp_template["prompt"]
+        .as_str()
+        .unwrap()
+        .contains("# Bugfix Prompt"));
 }
 
 #[test]
