@@ -125,4 +125,5 @@ ScoutPack development stays milestone-driven. Each major milestone should end wi
 - Watch mode with debounced incremental re-pack output
 - Optional local semantic embeddings behind `--features semantic`
 - Release binaries, install script, Homebrew formula template, and Scoop manifest template
+- Prompt template library with built-in and custom Markdown templates
 - monorepo workspace summaries

@@ -109,7 +109,8 @@ ScoutPack keeps the first agent prompt small and targeted: if an agent would oth
 | Smart scan | Respects `.gitignore`, `.scoutpackignore`, binary limits, and sensitive skips |
 | Code structure | TypeScript/TSX symbols, route handlers, imports, Markdown sections, config chunks |
 | Task context | Token-budgeted packet with relevant files, snippets, commands, and risks |
-| MCP server | Read-only `search`, `context`, `file_summary`, `symbol`, `commands`, `recent_changes`, `stats` tools |
+| Prompt templates | Built-in bugfix, refactor, review, docs, and test prompts |
+| MCP server | Read-only `search`, `context`, `template`, `file_summary`, `symbol`, `commands`, `recent_changes`, `stats` tools |
 | Automation output | JSON mode for wrappers and scripts |
 
 ## Search Terms
@@ -325,6 +326,12 @@ scoutpack context "fix login redirect loop" --budget 2500
 Builds a markdown packet for an AI coding task.
 
 ```bash
+scoutpack template bugfix "fix login redirect loop" --budget 2500
+```
+
+Builds an agent-ready prompt from a template plus ScoutPack context. Built-ins: `bugfix`, `refactor`, `review`, `docs`, `test`.
+
+```bash
 scoutpack context "review my PR" --branch
 scoutpack context "review auth changes" --diff main..HEAD
 scoutpack context "continue indexing work" --since HEAD~5
@@ -384,6 +391,7 @@ Generates shell completions for `bash`, `zsh`, `fish`, `powershell`, or `elvish`
 | Search | SQLite FTS5 plus deterministic ranking |
 | Optional semantic search | local fastembed embeddings behind `--features semantic`; never enabled by default |
 | Context | markdown packets with budget-aware snippets |
+| Templates | built-in and custom Markdown prompt templates |
 | MCP | read-only stdio server for agent clients |
 | Distribution | Cargo install plus generated shell completions |
 | Privacy | local-only index, sensitive file skips |
@@ -419,6 +427,7 @@ Security details: [SECURITY.md](SECURITY.md).
 - [Installation](docs/installation.md)
 - [Distribution](docs/distribution.md)
 - [MCP server](docs/mcp.md)
+- [Prompt templates](docs/templates.md)
 - [AI agent workflows](docs/ai-agent-workflows.md)
 - [Use cases](docs/use-cases.md)
 - [FAQ](docs/faq.md)

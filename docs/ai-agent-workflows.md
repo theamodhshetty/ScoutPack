@@ -11,6 +11,12 @@ scoutpack context "describe the task" --budget 2500
 
 Paste the packet before asking the agent to edit. For repeated work, configure the MCP server once and let the client call ScoutPack tools directly.
 
+For a complete task prompt, use a template:
+
+```bash
+scoutpack template bugfix "describe the bug" --budget 2500
+```
+
 ## Client Matrix
 
 | Client | Use ScoutPack with text | Use ScoutPack with MCP |
@@ -36,7 +42,7 @@ Then paste the output into Codex with the task.
 Text mode:
 
 ```bash
-scoutpack context "fix auth middleware redirect loop" --budget 2500
+scoutpack template bugfix "fix auth middleware redirect loop" --budget 2500
 ```
 
 Use the packet as the first message or as supporting context before asking Claude Code to edit.
@@ -116,7 +122,7 @@ scoutpack pack .
 scoutpack mcp .
 ```
 
-The MCP server exposes `search`, `context`, `file_summary`, `symbol`, `commands`, and `stats`. See [MCP server](mcp.md).
+The MCP server exposes `search`, `context`, `template`, `file_summary`, `symbol`, `commands`, and `stats`. See [MCP server](mcp.md).
 
 ## AGENTS.md Hint
 
@@ -127,6 +133,7 @@ Before broad repo exploration, run ScoutPack:
 
 - `scoutpack pack .` if `.scoutpack/pack.sqlite` is missing or stale.
 - `scoutpack context "<task>" --budget 2500` for a task packet.
-- Prefer ScoutPack MCP tools when available: `search`, `context`, `file_summary`, `symbol`, `commands`, `stats`.
+- `scoutpack template bugfix "<task>" --budget 2500` for an agent-ready prompt.
+- Prefer ScoutPack MCP tools when available: `search`, `context`, `template`, `file_summary`, `symbol`, `commands`, `stats`.
 - Do not run project scripts from ScoutPack output unless explicitly asked.
 ```

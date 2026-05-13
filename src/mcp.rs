@@ -1,4 +1,4 @@
-use crate::{context, git, index, search, token_budget};
+use crate::{context, git, index, search, templates, token_budget};
 use anyhow::{Context, Result};
 use rmcp::{
     handler::server::{router::tool::ToolRouter, wrapper::Parameters},
@@ -41,6 +41,24 @@ struct ContextRequest {
     task: String,
     #[schemars(description = "Approximate token budget for the returned packet.")]
     budget: Option<usize>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+struct TemplateRequest {
+    #[schemars(
+        description = "Template name, for example bugfix, refactor, review, docs, or test."
+    )]
+    name: String,
+    #[schemars(description = "AI coding task to build an agent-ready prompt for.")]
+    task: String,
+    #[schemars(description = "Approximate token budget for the embedded context packet.")]
+    budget: Option<usize>,
+    #[schemars(description = "Boost/summarize files changed since this git ref.")]
+    since: Option<String>,
+    #[schemars(description = "Git diff range like main..HEAD.")]
+    diff: Option<String>,
+    #[schemars(description = "Use current branch against main.")]
+    branch: Option<bool>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -108,6 +126,35 @@ impl ScoutpackMcp {
             "estimated_tokens": token_budget::estimate_tokens(&packet),
             "packet": packet,
         })))
+    }
+
+    #[tool(
+        name = "template",
+        description = "Render an agent-ready prompt from a named ScoutPack template and local context."
+    )]
+    fn template(
+        &self,
+        Parameters(TemplateRequest {
+            name,
+            task,
+            budget,
+            since,
+            diff,
+            branch,
+        }): Parameters<TemplateRequest>,
+    ) -> Result<CallToolResult, McpError> {
+        let git_mode =
+            optional_mcp_git_mode(since, diff, branch.unwrap_or(false)).map_err(to_mcp_error)?;
+        let prompt = templates::render_prompt(
+            &self.root,
+            &name,
+            &task,
+            templates::TemplateOptions { budget, git_mode },
+        )
+        .map_err(to_mcp_error)?;
+        Ok(structured(templates::render_summary(
+            &task, &prompt, &name, budget,
+        )))
     }
 
     #[tool(
@@ -188,6 +235,7 @@ impl ScoutpackMcp {
             "chunk_count": stats.chunk_count,
             "symbol_count": stats.symbol_count,
             "command_count": stats.command_count,
+            "embedding_count": stats.embedding_count,
             "skipped_count": stats.skipped_count,
             "manifest": stats.manifest,
         })))
@@ -256,4 +304,19 @@ fn mcp_git_mode(
         });
     }
     Ok(git::GitContextMode::Branch)
+}
+
+fn optional_mcp_git_mode(
+    since: Option<String>,
+    diff: Option<String>,
+    branch: bool,
+) -> Result<Option<git::GitContextMode>> {
+    let selected = since.is_some() as u8 + diff.is_some() as u8 + branch as u8;
+    if selected > 1 {
+        anyhow::bail!("Use only one of `since`, `diff`, or `branch`.");
+    }
+    if selected == 0 {
+        return Ok(None);
+    }
+    mcp_git_mode(since, diff, branch).map(Some)
 }
