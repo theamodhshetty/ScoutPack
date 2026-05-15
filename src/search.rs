@@ -214,6 +214,57 @@ pub fn chunks_for_paths(
     Ok(results)
 }
 
+pub fn expand_call_graph(
+    root: &Path,
+    seeds: &[SearchResult],
+    depth: usize,
+    limit: usize,
+    show_snippets: bool,
+) -> Result<Vec<SearchResult>> {
+    if seeds.is_empty() || depth == 0 || limit == 0 {
+        return Ok(Vec::new());
+    }
+    let conn = index::ensure_index(root)?;
+    let mut frontier: HashSet<String> = seeds
+        .iter()
+        .filter_map(|result| result.name.clone())
+        .collect();
+    let mut seen = frontier.clone();
+    let mut expanded = Vec::new();
+
+    for hop in 1..=depth.min(5) {
+        if frontier.is_empty() {
+            break;
+        }
+        let edges = call_edges_from_symbols(&conn, &frontier)?;
+        let mut next = HashSet::new();
+        for edge in edges {
+            if !seen.insert(edge.to_symbol.clone()) {
+                continue;
+            }
+            for result in chunks_for_symbol(&conn, &edge.to_symbol, show_snippets)? {
+                expanded.push(SearchResult {
+                    score: 1.0 - (hop as f64 * 0.1),
+                    reason: format!(
+                        "call graph: `{}` calls `{}` at {}:{}",
+                        edge.from_symbol, edge.to_symbol, edge.from_path, edge.line
+                    ),
+                    ..result
+                });
+            }
+            next.insert(edge.to_symbol);
+        }
+        frontier = next;
+    }
+
+    expanded.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(Ordering::Equal));
+    expanded.dedup_by(|a, b| {
+        a.path == b.path && a.start_line == b.start_line && a.end_line == b.end_line
+    });
+    expanded.truncate(limit);
+    Ok(expanded)
+}
+
 pub fn query_terms(query: &str) -> Vec<String> {
     query
         .split(|ch: char| !ch.is_ascii_alphanumeric() && ch != '_')
@@ -221,6 +272,75 @@ pub fn query_terms(query: &str) -> Vec<String> {
         .filter(|term| term.len() >= 2)
         .map(|term| term.to_ascii_lowercase())
         .collect()
+}
+
+#[derive(Debug)]
+struct CallEdgeRow {
+    from_path: String,
+    from_symbol: String,
+    to_symbol: String,
+    line: usize,
+}
+
+fn call_edges_from_symbols(
+    conn: &Connection,
+    symbols: &HashSet<String>,
+) -> Result<Vec<CallEdgeRow>> {
+    let mut stmt = conn.prepare(
+        "SELECT f.path, e.from_symbol, e.to_symbol, e.line
+         FROM symbol_edges e
+         JOIN files f ON e.from_file_id = f.id",
+    )?;
+    let rows = stmt.query_map([], |row| {
+        Ok(CallEdgeRow {
+            from_path: row.get(0)?,
+            from_symbol: row.get(1)?,
+            to_symbol: row.get(2)?,
+            line: row.get::<_, i64>(3)? as usize,
+        })
+    })?;
+    let mut edges = Vec::new();
+    for row in rows {
+        let edge = row?;
+        if symbols.contains(&edge.from_symbol) {
+            edges.push(edge);
+        }
+    }
+    Ok(edges)
+}
+
+fn chunks_for_symbol(
+    conn: &Connection,
+    symbol: &str,
+    show_snippets: bool,
+) -> Result<Vec<SearchResult>> {
+    let mut stmt = conn.prepare(
+        "SELECT f.path, s.kind, s.name, s.start_line, s.end_line, c.text
+         FROM symbols s
+         JOIN files f ON s.file_id = f.id
+         LEFT JOIN chunks c
+           ON c.file_id = s.file_id
+          AND c.start_line <= s.start_line
+          AND c.end_line >= s.end_line
+         WHERE s.name = ?1
+         ORDER BY f.path, s.start_line
+         LIMIT 8",
+    )?;
+    let rows = stmt.query_map(params![symbol], |row| {
+        let text = row.get::<_, Option<String>>(5)?;
+        Ok(SearchResult {
+            path: row.get(0)?,
+            kind: row.get(1)?,
+            name: Some(row.get(2)?),
+            start_line: row.get::<_, i64>(3)? as usize,
+            end_line: row.get::<_, i64>(4)? as usize,
+            text: text.and_then(|text| show_snippets.then(|| trim_snippet(&text, 900))),
+            score: 0.0,
+            reason: String::new(),
+        })
+    })?;
+    rows.collect::<rusqlite::Result<Vec<_>>>()
+        .map_err(Into::into)
 }
 
 fn add_symbol_matches(

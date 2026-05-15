@@ -26,6 +26,13 @@ pub struct Import {
 }
 
 #[derive(Debug, Clone)]
+pub struct CallEdge {
+    pub from_symbol: String,
+    pub to_symbol: String,
+    pub line: usize,
+}
+
+#[derive(Debug, Clone)]
 pub struct CommandInfo {
     pub name: String,
     pub command: String,
@@ -37,6 +44,7 @@ pub struct ChunkedFile {
     pub chunks: Vec<Chunk>,
     pub symbols: Vec<Symbol>,
     pub imports: Vec<Import>,
+    pub calls: Vec<CallEdge>,
     pub commands: Vec<CommandInfo>,
 }
 
@@ -710,6 +718,7 @@ fn chunk_javascript_tree_sitter(path: &str, text: &str) -> Option<ChunkedFile> {
     let mut imports = commonjs_imports(text);
     let mut symbols = Vec::new();
     let mut chunks = Vec::new();
+    let mut calls = Vec::new();
     let mut cursor = root.walk();
 
     for node in root.named_children(&mut cursor) {
@@ -721,6 +730,7 @@ fn chunk_javascript_tree_sitter(path: &str, text: &str) -> Option<ChunkedFile> {
         }
 
         if let Some((kind, name)) = javascript_route_call(node, text) {
+            collect_call_edges(&name, node, text, &mut calls);
             push_symbol_chunk(&mut symbols, &mut chunks, node, kind, name, text);
             continue;
         }
@@ -730,6 +740,7 @@ fn chunk_javascript_tree_sitter(path: &str, text: &str) -> Option<ChunkedFile> {
         else {
             continue;
         };
+        collect_call_edges(&name, chunk_node, text, &mut calls);
         push_symbol_chunk(&mut symbols, &mut chunks, chunk_node, kind, name, text);
 
         if declaration_node.kind() == "lexical_declaration"
@@ -754,6 +765,7 @@ fn chunk_javascript_tree_sitter(path: &str, text: &str) -> Option<ChunkedFile> {
         chunks,
         symbols,
         imports,
+        calls,
         ..ChunkedFile::default()
     })
 }
@@ -898,6 +910,7 @@ fn chunk_typescript_tree_sitter(path: &str, text: &str) -> Option<ChunkedFile> {
     let mut imports = Vec::new();
     let mut symbols = Vec::new();
     let mut chunks = Vec::new();
+    let mut calls = Vec::new();
     let mut cursor = root.walk();
 
     for node in root.named_children(&mut cursor) {
@@ -915,6 +928,7 @@ fn chunk_typescript_tree_sitter(path: &str, text: &str) -> Option<ChunkedFile> {
         };
         let start_line = chunk_node.start_position().row + 1;
         let end_line = chunk_node.end_position().row + 1;
+        collect_call_edges(&name, chunk_node, text, &mut calls);
         symbols.push(Symbol {
             name: name.clone(),
             kind: kind.clone(),
@@ -948,6 +962,7 @@ fn chunk_typescript_tree_sitter(path: &str, text: &str) -> Option<ChunkedFile> {
         chunks,
         symbols,
         imports,
+        calls,
         ..ChunkedFile::default()
     })
 }
@@ -1035,6 +1050,7 @@ fn chunk_python(path: &str, text: &str) -> ChunkedFile {
     let mut imports = Vec::new();
     let mut symbols = Vec::new();
     let mut chunks = Vec::new();
+    let mut calls = Vec::new();
     let mut cursor = root.walk();
     for node in root.named_children(&mut cursor) {
         match node.kind() {
@@ -1045,6 +1061,7 @@ fn chunk_python(path: &str, text: &str) -> ChunkedFile {
             }
             "function_definition" | "class_definition" | "decorated_definition" => {
                 if let Some((chunk_node, kind, name)) = python_symbol_from_node(node, text) {
+                    collect_call_edges(&name, chunk_node, text, &mut calls);
                     push_symbol_chunk(&mut symbols, &mut chunks, chunk_node, kind, name, text);
                 }
             }
@@ -1059,6 +1076,7 @@ fn chunk_python(path: &str, text: &str) -> ChunkedFile {
         chunks,
         symbols,
         imports,
+        calls,
         ..ChunkedFile::default()
     }
 }
@@ -1153,6 +1171,7 @@ fn chunk_rust(path: &str, text: &str) -> ChunkedFile {
     let mut imports = Vec::new();
     let mut symbols = Vec::new();
     let mut chunks = Vec::new();
+    let mut calls = Vec::new();
     let mut cursor = root.walk();
     for node in root.named_children(&mut cursor) {
         match node.kind() {
@@ -1164,6 +1183,7 @@ fn chunk_rust(path: &str, text: &str) -> ChunkedFile {
             "function_item" | "struct_item" | "enum_item" | "trait_item" | "impl_item"
             | "mod_item" => {
                 if let Some((kind, name)) = rust_symbol_from_node(node, text) {
+                    collect_call_edges(&name, node, text, &mut calls);
                     push_symbol_chunk(&mut symbols, &mut chunks, node, kind, name, text);
                 }
             }
@@ -1178,6 +1198,7 @@ fn chunk_rust(path: &str, text: &str) -> ChunkedFile {
         chunks,
         symbols,
         imports,
+        calls,
         ..ChunkedFile::default()
     }
 }
@@ -1248,6 +1269,7 @@ fn chunk_go(path: &str, text: &str) -> ChunkedFile {
     let mut imports = Vec::new();
     let mut symbols = Vec::new();
     let mut chunks = Vec::new();
+    let mut calls = Vec::new();
     let mut cursor = root.walk();
     for node in root.named_children(&mut cursor) {
         match node.kind() {
@@ -1281,6 +1303,7 @@ fn chunk_go(path: &str, text: &str) -> ChunkedFile {
                     } else {
                         "function"
                     };
+                    collect_call_edges(&name, node, text, &mut calls);
                     push_symbol_chunk(&mut symbols, &mut chunks, node, kind.to_owned(), name, text);
                 }
             }
@@ -1305,6 +1328,7 @@ fn chunk_go(path: &str, text: &str) -> ChunkedFile {
         chunks,
         symbols,
         imports,
+        calls,
         ..ChunkedFile::default()
     }
 }
@@ -1468,6 +1492,91 @@ fn push_symbol_chunk(
         end_line,
         text: node_text(node, text),
     });
+}
+
+fn collect_call_edges(from_symbol: &str, node: Node<'_>, text: &str, calls: &mut Vec<CallEdge>) {
+    if let Some(to_symbol) = call_name_from_node(node, text) {
+        push_call_edge(
+            from_symbol,
+            &to_symbol,
+            node.start_position().row + 1,
+            calls,
+        );
+    }
+
+    let mut cursor = node.walk();
+    for child in node.named_children(&mut cursor) {
+        collect_call_edges(from_symbol, child, text, calls);
+    }
+}
+
+fn push_call_edge(from_symbol: &str, to_symbol: &str, line: usize, calls: &mut Vec<CallEdge>) {
+    if from_symbol == to_symbol || is_noisy_call(to_symbol) {
+        return;
+    }
+    if calls.iter().any(|edge| {
+        edge.from_symbol == from_symbol && edge.to_symbol == to_symbol && edge.line == line
+    }) {
+        return;
+    }
+    calls.push(CallEdge {
+        from_symbol: from_symbol.to_owned(),
+        to_symbol: to_symbol.to_owned(),
+        line,
+    });
+}
+
+fn call_name_from_node(node: Node<'_>, text: &str) -> Option<String> {
+    if !matches!(node.kind(), "call_expression" | "call") {
+        return None;
+    }
+    let callee = node
+        .child_by_field_name("function")
+        .or_else(|| node.child_by_field_name("callee"))
+        .or_else(|| first_named_child(node))?;
+    terminal_identifier(&node_text(callee, text))
+}
+
+fn first_named_child(node: Node<'_>) -> Option<Node<'_>> {
+    let mut cursor = node.walk();
+    let child = node.named_children(&mut cursor).next();
+    child
+}
+
+fn terminal_identifier(text: &str) -> Option<String> {
+    let trimmed = text.trim().trim_start_matches("new ").trim();
+    let tail = trimmed
+        .rsplit(['.', ':', ' '])
+        .find(|part| !part.is_empty())
+        .unwrap_or(trimmed);
+    let ident = tail
+        .chars()
+        .filter(|ch| ch.is_ascii_alphanumeric() || *ch == '_')
+        .collect::<String>();
+    if ident.is_empty() || ident.chars().next().is_some_and(|ch| ch.is_ascii_digit()) {
+        None
+    } else {
+        Some(ident)
+    }
+}
+
+fn is_noisy_call(name: &str) -> bool {
+    matches!(
+        name,
+        "if" | "for"
+            | "while"
+            | "match"
+            | "return"
+            | "await"
+            | "String"
+            | "Vec"
+            | "Some"
+            | "None"
+            | "Ok"
+            | "Err"
+            | "println"
+            | "format"
+    )
 }
 
 fn import_from_node(node: Node<'_>, text: &str) -> Option<Import> {
@@ -1939,6 +2048,14 @@ max-line-length = 100
         assert!(symbols.contains(&("function", "requireAuth")));
         assert!(symbols.contains(&("function", "loginUser")));
         assert!(symbols.contains(&("component", "LoginButton")));
+        assert!(chunked
+            .calls
+            .iter()
+            .any(|edge| edge.from_symbol == "requireAuth" && edge.to_symbol == "next"));
+        assert!(chunked
+            .calls
+            .iter()
+            .any(|edge| edge.from_symbol == "loginUser" && edge.to_symbol == "json"));
     }
 
     #[test]
@@ -1971,6 +2088,10 @@ max-line-length = 100
         assert_eq!(chunked.symbols.len(), 1);
         assert_eq!(chunked.symbols[0].name, "requireAuth");
         assert_eq!(chunked.chunks[0].end_line, 4);
+        assert!(chunked
+            .calls
+            .iter()
+            .any(|edge| edge.from_symbol == "requireAuth" && edge.to_symbol == "getSession"));
     }
 
     #[test]
@@ -1997,7 +2118,7 @@ max-line-length = 100
 
     #[test]
     fn python_extracts_functions_classes_routes_and_imports() {
-        let text = "from fastapi import APIRouter\nimport services.auth\n\nrouter = APIRouter()\n\nclass UserService:\n    pass\n\n@router.get('/users/{user_id}')\ndef get_user(user_id: str):\n    return {'id': user_id}\n\ndef helper():\n    return None\n";
+        let text = "from fastapi import APIRouter\nimport services.auth\n\nrouter = APIRouter()\n\nclass UserService:\n    pass\n\n@router.get('/users/{user_id}')\ndef get_user(user_id: str):\n    return helper(user_id)\n\ndef helper(user_id: str):\n    return {'id': user_id}\n";
         let chunked = chunk_file("app/api/users.py", "python", text);
         let symbols: Vec<_> = chunked
             .symbols
@@ -2015,11 +2136,15 @@ max-line-length = 100
         assert!(symbols.contains(&("class", "UserService")));
         assert!(symbols.contains(&("route-handler", "get_user")));
         assert!(symbols.contains(&("function", "helper")));
+        assert!(chunked
+            .calls
+            .iter()
+            .any(|edge| edge.from_symbol == "get_user" && edge.to_symbol == "helper"));
     }
 
     #[test]
     fn rust_extracts_items_impls_modules_and_imports() {
-        let text = "use crate::config::Config;\n\npub mod commands;\n\npub struct Cli {\n    name: String,\n}\n\npub enum Mode {\n    Fast,\n}\n\npub trait Runnable {\n    fn run(&self);\n}\n\nimpl Cli {\n    pub fn new() -> Self {\n        Self { name: String::new() }\n    }\n}\n\npub fn execute() {}\n";
+        let text = "use crate::config::Config;\n\npub mod commands;\n\npub struct Cli {\n    name: String,\n}\n\npub enum Mode {\n    Fast,\n}\n\npub trait Runnable {\n    fn run(&self);\n}\n\nimpl Cli {\n    pub fn new() -> Self {\n        Self { name: String::new() }\n    }\n}\n\npub fn execute() {\n    Cli::new();\n}\n";
         let chunked = chunk_file("src/main.rs", "rust", text);
         let symbols: Vec<_> = chunked
             .symbols
@@ -2036,11 +2161,15 @@ max-line-length = 100
         assert!(symbols.contains(&("trait", "Runnable")));
         assert!(symbols.contains(&("impl", "impl Cli")));
         assert!(symbols.contains(&("function", "execute")));
+        assert!(chunked
+            .calls
+            .iter()
+            .any(|edge| edge.from_symbol == "execute" && edge.to_symbol == "new"));
     }
 
     #[test]
     fn go_extracts_package_imports_functions_methods_and_types() {
-        let text = "package api\n\nimport (\n    \"context\"\n    \"net/http\"\n)\n\ntype User struct {\n    ID string\n}\n\ntype Store interface {\n    Get(context.Context, string) (User, error)\n}\n\nfunc NewUser() User {\n    return User{}\n}\n\nfunc (u User) Validate() bool {\n    return u.ID != \"\"\n}\n";
+        let text = "package api\n\nimport (\n    \"context\"\n    \"net/http\"\n)\n\ntype User struct {\n    ID string\n}\n\ntype Store interface {\n    Get(context.Context, string) (User, error)\n}\n\nfunc NewUser() User {\n    return buildUser()\n}\n\nfunc buildUser() User {\n    return User{}\n}\n\nfunc (u User) Validate() bool {\n    return u.ID != \"\"\n}\n";
         let chunked = chunk_file("internal/api/user.go", "go", text);
         let symbols: Vec<_> = chunked
             .symbols
@@ -2059,7 +2188,12 @@ max-line-length = 100
         assert!(symbols.contains(&("struct", "User")));
         assert!(symbols.contains(&("interface", "Store")));
         assert!(symbols.contains(&("function", "NewUser")));
+        assert!(symbols.contains(&("function", "buildUser")));
         assert!(symbols.contains(&("method", "Validate")));
+        assert!(chunked
+            .calls
+            .iter()
+            .any(|edge| edge.from_symbol == "NewUser" && edge.to_symbol == "buildUser"));
     }
 
     #[test]

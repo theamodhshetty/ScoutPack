@@ -42,6 +42,8 @@ struct ContextRequest {
     task: String,
     #[schemars(description = "Approximate token budget for the returned packet.")]
     budget: Option<usize>,
+    #[schemars(description = "Follow direct symbol calls by N hops. Defaults to 0.")]
+    expand_calls: Option<usize>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -117,10 +119,27 @@ impl ScoutpackMcp {
     )]
     fn context(
         &self,
-        Parameters(ContextRequest { task, budget }): Parameters<ContextRequest>,
+        Parameters(ContextRequest {
+            task,
+            budget,
+            expand_calls,
+        }): Parameters<ContextRequest>,
     ) -> Result<CallToolResult, McpError> {
-        let packet =
-            context::build_context_packet(&self.root, &task, budget).map_err(to_mcp_error)?;
+        let expand_calls = expand_calls.unwrap_or(0);
+        let packet = if expand_calls == 0 {
+            context::build_context_packet(&self.root, &task, budget)
+        } else {
+            context::build_context_packet_with_options(
+                &self.root,
+                &task,
+                budget,
+                context::ContextOptions {
+                    expand_calls,
+                    ..context::ContextOptions::default()
+                },
+            )
+        }
+        .map_err(to_mcp_error)?;
         Ok(structured(json!({
             "task": task,
             "budget": budget,

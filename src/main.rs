@@ -86,6 +86,7 @@ async fn main() -> Result<()> {
             branch,
             semantic,
             semantic_alpha,
+            expand_calls,
         } => {
             let git_mode = context_git_mode(since, diff, branch)?;
             let packet = context::build_context_packet_with_options(
@@ -96,6 +97,7 @@ async fn main() -> Result<()> {
                     git_mode,
                     semantic,
                     semantic_alpha,
+                    expand_calls,
                 },
             )?;
             let format = if json { ContextFormat::Json } else { format };

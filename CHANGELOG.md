@@ -15,6 +15,7 @@ All notable ScoutPack changes are tracked here.
 - Release binary workflow, Unix install script, Homebrew formula template, and Scoop manifest template.
 - Prompt template library with `scoutpack template`, custom Markdown templates, and MCP `template` tool.
 - HTTP/SSE MCP mode via `scoutpack mcp . --http --port 7777`.
+- Basic symbol call graph indexing and `context --expand-calls` expansion.
 - Machine-readable JSON output for `search`, `context`, and `stats`.
 - Context output formats: markdown, JSON, and XML.
 - Python and Rust symbol/import extraction.

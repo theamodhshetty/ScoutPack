@@ -99,6 +99,10 @@ pub enum Commands {
         /// Weight for semantic score in hybrid ranking.
         #[arg(long, default_value_t = 0.45)]
         semantic_alpha: f64,
+
+        /// Follow direct symbol calls from matched symbols by N hops.
+        #[arg(long, default_value_t = 0)]
+        expand_calls: usize,
     },
 
     /// Render an agent-ready prompt from a named template and ScoutPack context.
