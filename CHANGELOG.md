@@ -6,6 +6,7 @@ All notable ScoutPack changes are tracked here.
 
 ### Added
 
+- Positioning doc and launch-focused roadmap/milestone reset around ScoutPack as a context preflight layer.
 - JavaScript and JSX symbol/import extraction, including ESM imports, CommonJS requires, components, and Express-style route handlers.
 - Python and Go config expansion for `pyproject.toml`, `requirements.txt`, `Pipfile`, `setup.cfg`, and `go.mod` commands/framework signals.
 - Git-aware context flags: `--since`, `--diff`, and `--branch`, plus MCP `recent_changes`.

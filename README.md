@@ -3,11 +3,11 @@
 </p>
 
 <p align="center">
-  <strong>Offline repo context compiler for AI coding agents.</strong>
+  <strong>Context preflight for AI coding agents.</strong>
 </p>
 
 <p align="center">
-  Build a local searchable index, then hand Codex, Claude Code, Cursor, Aider, and other agents only the files, symbols, snippets, commands, and risks that matter.
+  Help Codex, Claude Code, Cursor, Aider, Copilot, and MCP clients start with the right files, not the whole repo.
 </p>
 
 <p align="center">
@@ -48,6 +48,8 @@ ScoutPack answers one practical question before edits start:
 ```txt
 What should this AI agent read first for this task?
 ```
+
+Think of ScoutPack as a local context preflight check: run it before asking an agent to edit code, review a PR, debug a failing flow, or audit a risky path.
 
 ## One-Minute Flow
 
@@ -108,7 +110,7 @@ ScoutPack keeps the first agent prompt small and targeted: if an agent would oth
 | --- | --- |
 | Local index | SQLite + FTS5 index in `.scoutpack/` |
 | Smart scan | Respects `.gitignore`, `.scoutpackignore`, binary limits, and sensitive skips |
-| Code structure | TypeScript/TSX symbols, route handlers, imports, Markdown sections, config chunks |
+| Code structure | JS/TS, Python, Rust, Go, Solidity symbols, imports, and direct call edges |
 | Task context | Token-budgeted packet with relevant files, snippets, commands, and risks |
 | Prompt templates | Built-in bugfix, refactor, review, docs, and test prompts |
 | MCP server | Read-only `search`, `context`, `template`, `file_summary`, `symbol`, `commands`, `recent_changes`, `stats` tools |
@@ -116,7 +118,7 @@ ScoutPack keeps the first agent prompt small and targeted: if an agent would oth
 
 ## Search Terms
 
-People may look for this as AI coding agent context, local codebase search for AI, offline repo indexing, context engineering for code, local-first RAG alternative, token-budgeted code context, repo map, MCP code search, or private repo context.
+People may look for this as AI coding agent context, context preflight, local codebase search for AI, offline repo indexing, context engineering for code, local-first RAG alternative, token-budgeted code context, repo map, MCP code search, or private repo context.
 
 ## Install
 
@@ -446,6 +448,7 @@ Security details: [SECURITY.md](SECURITY.md).
 
 - [Installation](docs/installation.md)
 - [Distribution](docs/distribution.md)
+- [Positioning](docs/positioning.md)
 - [MCP server](docs/mcp.md)
 - [Prompt templates](docs/templates.md)
 - [AI agent workflows](docs/ai-agent-workflows.md)
