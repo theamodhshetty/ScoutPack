@@ -534,6 +534,69 @@ fn mcp_http_mode_accepts_streamable_initialize() {
     );
 }
 
+#[test]
+fn context_expand_calls_includes_called_symbol_file() {
+    let temp = tempfile::tempdir().unwrap();
+    fs::create_dir_all(temp.path().join("src")).unwrap();
+    fs::write(
+        temp.path().join("src/login.ts"),
+        "export function loginController() {\n  return normalizeRedirect('/dashboard');\n}\n",
+    )
+    .unwrap();
+    fs::write(
+        temp.path().join("src/redirect.ts"),
+        "export function normalizeRedirect(path: string) {\n  return path.startsWith('/') ? path : `/${path}`;\n}\n",
+    )
+    .unwrap();
+
+    let init = Command::new(bin())
+        .arg("init")
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        init.status.success(),
+        "{}",
+        String::from_utf8_lossy(&init.stderr)
+    );
+
+    let pack = Command::new(bin())
+        .args(["pack", "."])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        pack.status.success(),
+        "{}",
+        String::from_utf8_lossy(&pack.stderr)
+    );
+
+    let context = Command::new(bin())
+        .args([
+            "context",
+            "loginController",
+            "--expand-calls",
+            "1",
+            "--budget",
+            "2500",
+        ])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        context.status.success(),
+        "{}",
+        String::from_utf8_lossy(&context.stderr)
+    );
+    let out = String::from_utf8_lossy(&context.stdout);
+    assert!(out.contains("src/login.ts"), "{out}");
+    assert!(out.contains("src/redirect.ts"), "{out}");
+    assert!(
+        out.contains("call graph: `loginController` calls `normalizeRedirect`"),
+        "{out}"
+    );
+}
+
 fn send_mcp_initialize(port: u16) -> Option<String> {
     let body = r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"integration-test","version":"0.0.0"}}}"#;
     let request = format!(

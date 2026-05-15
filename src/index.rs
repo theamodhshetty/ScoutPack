@@ -13,7 +13,7 @@ const INDEX_DIR: &str = ".scoutpack";
 const DB_FILE: &str = "pack.sqlite";
 const MANIFEST_FILE: &str = "manifest.json";
 const REPO_MAP_FILE: &str = "repo-map.md";
-const SCHEMA_VERSION: i64 = 3;
+const SCHEMA_VERSION: i64 = 4;
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct PackOptions {
@@ -493,6 +493,14 @@ fn insert_scanned_file(
         )?;
     }
 
+    for call in chunked.calls {
+        tx.execute(
+            "INSERT INTO symbol_edges (from_file_id, from_symbol, to_symbol, line)
+             VALUES (?1, ?2, ?3, ?4)",
+            params![file_id, call.from_symbol, call.to_symbol, call.line as i64],
+        )?;
+    }
+
     for command in chunked.commands {
         tx.execute(
             "INSERT INTO commands (name, command, source)
@@ -507,6 +515,10 @@ fn insert_scanned_file(
 fn delete_file(tx: &Transaction<'_>, file_id: i64, path: &str) -> Result<()> {
     tx.execute(
         "DELETE FROM imports WHERE from_file_id = ?1",
+        params![file_id],
+    )?;
+    tx.execute(
+        "DELETE FROM symbol_edges WHERE from_file_id = ?1",
         params![file_id],
     )?;
     tx.execute("DELETE FROM symbols WHERE file_id = ?1", params![file_id])?;
@@ -580,6 +592,7 @@ fn recreate_schema(conn: &Connection) -> Result<()> {
         PRAGMA foreign_keys = OFF;
         DROP TABLE IF EXISTS chunks_fts;
         DROP TABLE IF EXISTS imports;
+        DROP TABLE IF EXISTS symbol_edges;
         DROP TABLE IF EXISTS symbols;
         DROP TABLE IF EXISTS chunk_embeddings;
         DROP TABLE IF EXISTS chunks;
@@ -640,6 +653,15 @@ fn recreate_schema(conn: &Connection) -> Result<()> {
           from_file_id INTEGER NOT NULL,
           to_path TEXT NOT NULL,
           symbol TEXT,
+          FOREIGN KEY(from_file_id) REFERENCES files(id)
+        );
+
+        CREATE TABLE symbol_edges (
+          id INTEGER PRIMARY KEY,
+          from_file_id INTEGER NOT NULL,
+          from_symbol TEXT NOT NULL,
+          to_symbol TEXT NOT NULL,
+          line INTEGER NOT NULL,
           FOREIGN KEY(from_file_id) REFERENCES files(id)
         );
 

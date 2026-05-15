@@ -62,6 +62,7 @@ pub fn render_prompt(
             git_mode: options.git_mode.clone(),
             semantic: false,
             semantic_alpha: 0.45,
+            expand_calls: 0,
         },
     )?;
     let recent_changes = render_recent_changes(root, options.git_mode.as_ref())?;

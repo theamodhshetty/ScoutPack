@@ -98,6 +98,7 @@ ScoutPack keeps the first agent prompt small and targeted: if an agent would oth
 | Fewer wasted reads | ranked search points at likely edit files first |
 | Smaller first prompt | `context --budget` trims snippets to a fixed target |
 | Less manual setup | package scripts, framework signals, and risks are included |
+| Better dependency trail | `context --expand-calls` follows direct symbol calls |
 | Better handoff | Markdown, JSON, and MCP all expose the same local index |
 | Safer context | common secret files skipped before indexing |
 
@@ -331,6 +332,12 @@ scoutpack context "fix login redirect loop" --budget 2500
 ```
 
 Builds a markdown packet for an AI coding task.
+
+```bash
+scoutpack context "fix login redirect loop" --expand-calls 2 --budget 2500
+```
+
+Adds symbols called by matched symbols, useful when root-cause code lives behind a helper or service call.
 
 ```bash
 scoutpack template bugfix "fix login redirect loop" --budget 2500

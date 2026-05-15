@@ -8,6 +8,7 @@ pub struct ContextOptions {
     pub git_mode: Option<git::GitContextMode>,
     pub semantic: bool,
     pub semantic_alpha: f64,
+    pub expand_calls: usize,
 }
 
 impl Default for ContextOptions {
@@ -16,6 +17,7 @@ impl Default for ContextOptions {
             git_mode: None,
             semantic: false,
             semantic_alpha: 0.45,
+            expand_calls: 0,
         }
     }
 }
@@ -51,6 +53,11 @@ pub fn build_context_packet_with_options(
     let neighbors = search::enrich_with_import_neighbors(root, &results, 4, true)?;
     merge_results(&mut results, neighbors);
     let recent_changes = apply_git_context(root, options.git_mode.as_ref(), &mut results)?;
+    if options.expand_calls > 0 {
+        let call_neighbors =
+            search::expand_call_graph(root, &results, options.expand_calls, 8, true)?;
+        merge_results(&mut results, call_neighbors);
+    }
     let commands = index::read_commands(&conn)?;
     let frameworks = index::framework_signals(&conn)?;
 
@@ -230,11 +237,16 @@ fn required_tail(
 
 fn merge_results(results: &mut Vec<search::SearchResult>, extra: Vec<search::SearchResult>) {
     for result in extra {
-        if results.iter().any(|existing| {
+        if let Some(existing) = results.iter_mut().find(|existing| {
             existing.path == result.path
                 && existing.start_line == result.start_line
                 && existing.end_line == result.end_line
         }) {
+            if result.reason.starts_with("call graph:")
+                && !existing.reason.contains(result.reason.as_str())
+            {
+                existing.reason = format!("{}; {}", existing.reason, result.reason);
+            }
             continue;
         }
         results.push(result);
@@ -257,7 +269,12 @@ fn relevant_files(results: &[search::SearchResult]) -> Vec<(String, String)> {
         }
         let reason = {
             if let Some(name) = &result.name {
-                format!("{} `{name}`", result.kind)
+                let base = format!("{} `{name}`", result.kind);
+                if result.reason.contains("call graph:") {
+                    format!("{base}; {}", result.reason)
+                } else {
+                    base
+                }
             } else {
                 result.reason.clone()
             }

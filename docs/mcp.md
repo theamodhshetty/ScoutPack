@@ -93,7 +93,7 @@ Security notes:
 | Tool | Purpose |
 | --- | --- |
 | `search` | ranked local index search with optional snippets |
-| `context` | token-budgeted task packet |
+| `context` | token-budgeted task packet, optionally with `expand_calls` call-graph expansion |
 | `template` | agent-ready prompt from a named template plus local context |
 | `file_summary` | indexed metadata, symbols, and chunk ranges for one file |
 | `symbol` | exact or partial symbol lookup |

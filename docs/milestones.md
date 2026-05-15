@@ -127,4 +127,5 @@ ScoutPack development stays milestone-driven. Each major milestone should end wi
 - Release binaries, install script, Homebrew formula template, and Scoop manifest template
 - Prompt template library with built-in and custom Markdown templates
 - HTTP/SSE MCP mode for clients that do not use stdio
+- Basic symbol call graph with `context --expand-calls`
 - monorepo workspace summaries
