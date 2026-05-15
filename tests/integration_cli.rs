@@ -1,6 +1,7 @@
 use std::{
     fs,
-    io::Write,
+    io::{Read, Write},
+    net::TcpStream,
     path::Path,
     process::{Command, Stdio},
     thread,
@@ -375,6 +376,7 @@ fn init_pack_search_context_stats_work() {
     assert!(completions_out.contains("watch"));
     assert!(completions_out.contains("template"));
     assert!(completions_out.contains("semantic"));
+    assert!(completions_out.contains("--http"));
 
     let mut mcp = Command::new(bin())
         .args(["mcp", "."])
@@ -456,6 +458,96 @@ fn init_pack_search_context_stats_work() {
         .as_str()
         .unwrap()
         .contains("# Bugfix Prompt"));
+}
+
+#[test]
+fn mcp_http_mode_accepts_streamable_initialize() {
+    let temp = tempfile::tempdir().unwrap();
+    copy_dir(Path::new("tests/fixtures/nextjs-basic"), temp.path());
+
+    let init = Command::new(bin())
+        .arg("init")
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        init.status.success(),
+        "{}",
+        String::from_utf8_lossy(&init.stderr)
+    );
+
+    let pack = Command::new(bin())
+        .args(["pack", "."])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        pack.status.success(),
+        "{}",
+        String::from_utf8_lossy(&pack.stderr)
+    );
+
+    let probe = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = probe.local_addr().unwrap().port();
+    drop(probe);
+
+    let mut mcp = Command::new(bin())
+        .args(["mcp", ".", "--http", "--port", &port.to_string()])
+        .current_dir(temp.path())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+
+    let started = Instant::now();
+    let response = loop {
+        if started.elapsed() > Duration::from_secs(5) {
+            let _ = mcp.kill();
+            let output = mcp.wait_with_output().unwrap();
+            panic!(
+                "MCP HTTP server did not accept initialize.\nstdout:\n{}\nstderr:\n{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
+        if let Some(response) = send_mcp_initialize(port) {
+            if response.starts_with("HTTP/1.1 200") {
+                break response;
+            }
+        }
+        thread::sleep(Duration::from_millis(50));
+    };
+
+    let _ = mcp.kill();
+    let output = mcp.wait_with_output().unwrap();
+    assert!(
+        response
+            .to_ascii_lowercase()
+            .contains("content-type: text/event-stream"),
+        "{response}"
+    );
+    assert!(response.contains("serverInfo"), "{response}");
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("ScoutPack MCP HTTP listening"),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+fn send_mcp_initialize(port: u16) -> Option<String> {
+    let body = r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"integration-test","version":"0.0.0"}}}"#;
+    let request = format!(
+        "POST /mcp HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nContent-Type: application/json\r\nAccept: application/json, text/event-stream\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+        body.len()
+    );
+    let mut stream = TcpStream::connect(("127.0.0.1", port)).ok()?;
+    stream
+        .set_read_timeout(Some(Duration::from_millis(750)))
+        .ok()?;
+    stream.write_all(request.as_bytes()).ok()?;
+    let mut response = String::new();
+    let _ = stream.read_to_string(&mut response);
+    Some(response)
 }
 
 #[test]

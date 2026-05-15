@@ -14,6 +14,7 @@ All notable ScoutPack changes are tracked here.
 - Optional local semantic search behind the `semantic` Cargo feature, with `pack --embed`, `search --semantic`, and `context --semantic`.
 - Release binary workflow, Unix install script, Homebrew formula template, and Scoop manifest template.
 - Prompt template library with `scoutpack template`, custom Markdown templates, and MCP `template` tool.
+- HTTP/SSE MCP mode via `scoutpack mcp . --http --port 7777`.
 - Machine-readable JSON output for `search`, `context`, and `stats`.
 - Context output formats: markdown, JSON, and XML.
 - Python and Rust symbol/import extraction.

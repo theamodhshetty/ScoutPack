@@ -139,6 +139,18 @@ pub enum Commands {
     Mcp {
         #[arg(default_value = ".")]
         path: PathBuf,
+
+        /// Serve MCP over Streamable HTTP/SSE instead of stdio.
+        #[arg(long, default_value_t = false)]
+        http: bool,
+
+        /// Host to bind for HTTP MCP mode.
+        #[arg(long, default_value = "127.0.0.1")]
+        host: String,
+
+        /// Port to bind for HTTP MCP mode.
+        #[arg(long, default_value_t = 7777)]
+        port: u16,
     },
 
     /// Generate shell completion script.
