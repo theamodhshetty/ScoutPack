@@ -140,8 +140,17 @@ async fn main() -> Result<()> {
                 output::print_stats(&stats);
             }
         }
-        Commands::Mcp { path } => {
-            mcp::serve(path).await?;
+        Commands::Mcp {
+            path,
+            http,
+            host,
+            port,
+        } => {
+            if http {
+                mcp::serve_http(path, &host, port).await?;
+            } else {
+                mcp::serve(path).await?;
+            }
         }
         Commands::Completions { shell } => {
             let mut command = Cli::command();

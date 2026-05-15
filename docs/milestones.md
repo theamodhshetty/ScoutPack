@@ -126,4 +126,5 @@ ScoutPack development stays milestone-driven. Each major milestone should end wi
 - Optional local semantic embeddings behind `--features semantic`
 - Release binaries, install script, Homebrew formula template, and Scoop manifest template
 - Prompt template library with built-in and custom Markdown templates
+- HTTP/SSE MCP mode for clients that do not use stdio
 - monorepo workspace summaries

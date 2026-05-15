@@ -230,11 +230,18 @@ Available tools:
 | --- | --- |
 | `search` | ranked files, symbols, snippets, and reasons |
 | `context` | full task packet with estimated token count |
+| `template` | agent-ready prompt from a named template plus local context |
 | `file_summary` | indexed file metadata, symbols, and chunk ranges |
 | `symbol` | exact or partial symbol matches |
 | `commands` | discovered package scripts without running them |
 | `recent_changes` | local git diff summary for branch, diff, or since ranges |
 | `stats` | index counts and manifest details |
+
+HTTP/SSE clients can use the same tools at `http://127.0.0.1:7777/mcp`:
+
+```bash
+scoutpack mcp . --http --port 7777
+```
 
 Full setup: [docs/mcp.md](docs/mcp.md).
 
@@ -245,7 +252,7 @@ Full setup: [docs/mcp.md](docs/mcp.md).
 | Codex | Run `scoutpack context "task" --budget 2500`, paste packet into task. | MCP users can configure ScoutPack as a local stdio MCP server. |
 | Claude Code | Add ScoutPack via `.mcp.json` or `claude mcp add`, then ask Claude to use `scoutpack.context`. | Best for repeated repo work. |
 | GitHub Copilot / VS Code | Add ScoutPack to `.vscode/mcp.json`, open Copilot Chat Agent mode, enable tools. | Uses VS Code MCP config format. |
-| Cursor | Add ScoutPack to Cursor MCP config or paste `context` output. | Same read-only tools. |
+| Cursor | Add ScoutPack to Cursor MCP config or paste `context` output. | Same read-only tools over stdio or HTTP/SSE where supported. |
 | Aider | Use `search` output to choose files, then add them to Aider. | Good when you want explicit file control. |
 | Scripts/CI helpers | Use `search --json`, `context --json`, `stats --json`. | Stable machine-readable output. |
 
@@ -367,7 +374,13 @@ Returns index stats and manifest data as JSON.
 scoutpack mcp .
 ```
 
-Starts a read-only MCP server over the existing local index. Tools include `search`, `context`, `file_summary`, `symbol`, `commands`, `recent_changes`, and `stats`.
+Starts a read-only stdio MCP server over the existing local index. Tools include `search`, `context`, `template`, `file_summary`, `symbol`, `commands`, `recent_changes`, and `stats`.
+
+```bash
+scoutpack mcp . --http --port 7777
+```
+
+Starts the same MCP tools over local Streamable HTTP/SSE at `http://127.0.0.1:7777/mcp`.
 
 ```bash
 scoutpack completions zsh > _scoutpack

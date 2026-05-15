@@ -7,7 +7,8 @@ use rmcp::{
 };
 use serde::Deserialize;
 use serde_json::{json, Value};
-use std::path::PathBuf;
+use std::{path::PathBuf, sync::Arc};
+use tokio_util::sync::CancellationToken;
 
 #[derive(Debug, Clone)]
 pub struct ScoutpackMcp {
@@ -268,6 +269,44 @@ pub async fn serve(path: PathBuf) -> Result<()> {
         .await
         .map_err(|err| anyhow::anyhow!(err))?;
     service.waiting().await?;
+    Ok(())
+}
+
+pub async fn serve_http(path: PathBuf, host: &str, port: u16) -> Result<()> {
+    use rmcp::transport::streamable_http_server::{
+        session::local::LocalSessionManager, StreamableHttpServerConfig, StreamableHttpService,
+    };
+
+    if !path.exists() {
+        anyhow::bail!("Path does not exist: {}", path.display());
+    }
+    let root = path
+        .canonicalize()
+        .with_context(|| format!("Could not resolve path {}", path.display()))?;
+    let cancellation = CancellationToken::new();
+    let service_root = root.clone();
+    let service = StreamableHttpService::new(
+        move || Ok(ScoutpackMcp::new(service_root.clone())),
+        Arc::new(LocalSessionManager::default()),
+        StreamableHttpServerConfig::default().with_cancellation_token(cancellation.child_token()),
+    );
+    let app = axum::Router::new().nest_service("/mcp", service);
+    let listener = tokio::net::TcpListener::bind((host, port))
+        .await
+        .with_context(|| format!("Could not bind MCP HTTP server to {host}:{port}"))?;
+    let addr = listener.local_addr()?;
+    eprintln!(
+        "ScoutPack MCP HTTP listening on http://{addr}/mcp for {}",
+        root.display()
+    );
+    axum::serve(listener, app)
+        .with_graceful_shutdown(async move {
+            if tokio::signal::ctrl_c().await.is_ok() {
+                cancellation.cancel();
+            }
+        })
+        .await
+        .map_err(|err| anyhow::anyhow!(err))?;
     Ok(())
 }
 
