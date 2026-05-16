@@ -173,11 +173,14 @@ ScoutPack writes local-only data:
 
 ## Demo
 
-Search:
+<p align="center">
+  <img src="assets/scoutpack-terminal-demo.svg" width="820" alt="ScoutPack terminal demo">
+</p>
 
-```txt
-1. src/middleware/auth.ts:3-14 [function] requireAuth
-   reason: matched auth in path, matched middleware in path
+Branch-aware PR review:
+
+```bash
+scoutpack context "review login redirect PR" --branch --expand-calls 1 --budget 2200
 ```
 
 Context packet:
@@ -186,12 +189,15 @@ Context packet:
 # ScoutPack Context
 
 Task:
-fix login redirect loop
+review login redirect PR
 
 Relevant Files:
-- `src/app/login/page.tsx`: component `LoginPage`
-- `src/lib/session.ts`: function `getSession`
 - `src/middleware/auth.ts`: function `requireAuth`
+- `src/lib/session.ts`: function `getSession`; call graph: `requireAuth` calls `getSession`
+
+Recent Changes:
+- Range: `main`..`HEAD`
+- Summary: 1 files changed, +4 -1
 
 Current Repo Signals:
 - Framework: Next.js, React, Vitest
@@ -200,17 +206,16 @@ Current Repo Signals:
 - build command: `next build`
 
 Likely Edit Areas:
-- `src/app/login/page.tsx:3-11`
 - `src/lib/session.ts:5-7`
-- `src/middleware/auth.ts:3-14`
+- `src/middleware/auth.ts:3-18`
 - auth/session boundary files
 - redirect and destination parameter handling
 
 Risks:
-- redirect loop if post-login destination points back to login or auth guard (source: `src/middleware/auth.ts:3-14`)
+- redirect loop if post-login destination points back to login or auth guard (source: `src/middleware/auth.ts:3-18`)
 ```
 
-Full sample: [examples/context.md](examples/context.md).
+Full walkthrough: [docs/demo.md](docs/demo.md).
 
 ## MCP Server
 
@@ -449,6 +454,8 @@ Security details: [SECURITY.md](SECURITY.md).
 - [Installation](docs/installation.md)
 - [Distribution](docs/distribution.md)
 - [Positioning](docs/positioning.md)
+- [Demo](docs/demo.md)
+- [Comparison](docs/comparison.md)
 - [MCP server](docs/mcp.md)
 - [Prompt templates](docs/templates.md)
 - [AI agent workflows](docs/ai-agent-workflows.md)
