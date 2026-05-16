@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="560" viewBox="0 0 1080 560" role="img" aria-labelledby="title desc">
+  <title id="title">ScoutPack terminal demo</title>
+  <desc id="desc">Terminal-style demo showing ScoutPack generating a context packet for a login redirect PR.</desc>
+  <rect width="1080" height="560" rx="18" fill="#0b1220"/>
+  <rect x="28" y="28" width="1024" height="504" rx="14" fill="#101827" stroke="#233044" stroke-width="2"/>
+  <circle cx="58" cy="58" r="7" fill="#ef4444"/>
+  <circle cx="82" cy="58" r="7" fill="#f59e0b"/>
+  <circle cx="106" cy="58" r="7" fill="#22c55e"/>
+  <text x="136" y="64" fill="#94a3b8" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16">ScoutPack context preflight</text>
+
+  <text x="56" y="116" fill="#38bdf8" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18">$ scoutpack context &quot;review login redirect PR&quot; --branch --expand-calls 1 --budget 2200</text>
+
+  <text x="56" y="164" fill="#e5e7eb" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18">Relevant Files</text>
+  <text x="76" y="198" fill="#cbd5e1" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16">- src/middleware/auth.ts: function requireAuth</text>
+  <text x="76" y="226" fill="#cbd5e1" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16">- src/lib/session.ts: function getSession</text>
+  <text x="96" y="254" fill="#14b8a6" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="15">call graph: requireAuth calls getSession at src/middleware/auth.ts:4</text>
+
+  <text x="56" y="306" fill="#e5e7eb" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18">Recent Changes</text>
+  <text x="76" y="340" fill="#cbd5e1" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16">- main..HEAD: 1 file changed, +4 -1</text>
+
+  <text x="56" y="392" fill="#e5e7eb" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18">Commands</text>
+  <text x="76" y="426" fill="#cbd5e1" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16">- vitest</text>
+  <text x="76" y="454" fill="#cbd5e1" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16">- eslint .</text>
+  <text x="76" y="482" fill="#cbd5e1" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16">- next build</text>
+
+  <text x="594" y="306" fill="#e5e7eb" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18">Risk Hints</text>
+  <text x="614" y="340" fill="#fbbf24" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16">- redirect loop risk</text>
+  <text x="614" y="368" fill="#fbbf24" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16">- SSR/session boundary risk</text>
+
+  <rect x="594" y="400" width="390" height="72" rx="10" fill="#172033" stroke="#334155"/>
+  <text x="618" y="432" fill="#e5e7eb" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16">Packet ready for Claude Code,</text>
+  <text x="618" y="458" fill="#e5e7eb" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16">Codex, Cursor, Aider, MCP</text>
+</svg>

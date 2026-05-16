@@ -133,13 +133,21 @@ scoutpack context "review my PR" --branch --expand-calls 1 --budget 3000
 
 Goal: make ScoutPack understandable in 30 seconds.
 
-- update README first screen around "context preflight"
-- add terminal GIF or asciinema demo
-- add `docs/positioning.md`
-- add `docs/demo.md`
-- add `docs/comparison.md`
-- add "ScoutPack vs Repomix/Aider/Cursor/Sourcegraph" section
-- add real PR-review demo output
+Status: in progress.
+
+Done:
+
+- README first screen around "context preflight"
+- terminal-style README demo asset
+- `docs/positioning.md`
+- `docs/demo.md`
+- `docs/comparison.md`
+- "ScoutPack vs Repomix/Aider/Cursor/Sourcegraph" comparison
+- real PR-review demo output
+
+Remaining:
+
+- terminal GIF or asciinema recording when recording tooling is available
 - update repo description/topics if needed
 
 Acceptance:
