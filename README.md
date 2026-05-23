@@ -95,7 +95,7 @@ No cloud. No API key. No telemetry. No auto-edits. No project command execution.
   <img src="assets/scoutpack-efficiency.svg" width="760" alt="ScoutPack efficiency model">
 </p>
 
-ScoutPack keeps the first agent prompt small and targeted: if an agent would otherwise read broad files and chat history before finding the right area, ScoutPack lets you start from a focused packet such as `--budget 2500`. Reproducible numbers live in [benches/RESULTS.md](benches/RESULTS.md).
+ScoutPack keeps the first agent prompt small and targeted: if an agent would otherwise read broad files and chat history before finding the right area, ScoutPack lets you start from a focused packet such as `--budget 2500`. Reproducible numbers live in [benches/RESULTS.md](benches/RESULTS.md), with methodology in [docs/benchmarks.md](docs/benchmarks.md).
 
 | Efficiency lever | How ScoutPack helps |
 | --- | --- |
@@ -105,6 +105,12 @@ ScoutPack keeps the first agent prompt small and targeted: if an agent would oth
 | Better dependency trail | `context --expand-calls` follows direct symbol calls |
 | Better handoff | Markdown, JSON, and MCP all expose the same local index |
 | Safer context | common secret files skipped before indexing |
+
+Run the same measurement on your own repo:
+
+```bash
+scripts/bench-one-repo.sh /path/to/repo "review my PR" /tmp/scoutpack-benchmark.md
+```
 
 ## What You Get
 

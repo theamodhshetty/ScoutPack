@@ -4,6 +4,8 @@ ScoutPack is a context preflight layer. It helps AI coding agents start with the
 
 This page compares workflow fit, not product quality. Use the tool that matches the job.
 
+For measurable context-size and speed comparisons, see [Benchmarks](benchmarks.md) and [benchmark results](../benches/RESULTS.md). Those results measure packet size and workflow latency, not model edit correctness.
+
 ## Summary
 
 | Tool | Best fit | ScoutPack difference |
