@@ -210,7 +210,7 @@ fn init_pack_search_context_stats_work() {
     assert!(context_json_value["packet"]
         .as_str()
         .unwrap()
-        .contains("Risks:"));
+        .contains("Risk Hints:"));
     assert!(context_json_value["packet"]
         .as_str()
         .unwrap()
@@ -271,7 +271,10 @@ fn init_pack_search_context_stats_work() {
     );
     let tiny_context_out = String::from_utf8_lossy(&tiny_context.stdout);
     assert!(tiny_context_out.contains("Commands:"), "{tiny_context_out}");
-    assert!(tiny_context_out.contains("Risks:"), "{tiny_context_out}");
+    assert!(
+        tiny_context_out.contains("Risk Hints:"),
+        "{tiny_context_out}"
+    );
     assert!(
         tiny_context_out.contains("Budget exhausted")
             || tiny_context_out.contains("Unknown from index"),

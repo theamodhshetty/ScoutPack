@@ -11,7 +11,7 @@ scoutpack pack .
 scoutpack context "fix login redirect loop" --budget 2500
 ```
 
-Paste the context packet into the agent prompt. The packet points at likely edit files, repo signals, commands, snippets, and risks.
+Paste the context packet into the agent prompt. The packet points at likely edit files, repo signals, commands, snippets, and risk hints.
 
 ## Offline Codebase Search
 
@@ -46,4 +46,3 @@ ScoutPack can be useful in teams where:
 ## Local RAG Alternative
 
 ScoutPack is not a general RAG platform. It deliberately starts with deterministic ranking instead of embeddings. This makes v0.1 easier to inspect, faster to run, and safer for private code.
-

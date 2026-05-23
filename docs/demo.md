@@ -20,7 +20,7 @@ scoutpack context "review login redirect PR" --branch --expand-calls 1 --budget 
 
 ## Output
 
-ScoutPack returns a packet focused on changed files, called helpers, likely commands, and risks.
+ScoutPack returns a packet focused on changed files, called helpers, likely commands, and risk hints.
 
 ````md
 # ScoutPack Context
@@ -81,13 +81,13 @@ Commands:
 - `eslint .`
 - `next build`
 
-Risks:
-- redirect loop if post-login destination points back to login or auth guard (source: `src/middleware/auth.ts:3-18`)
-- SSR/client mismatch if session state is checked only client-side (source: `src/middleware/auth.ts:3-18`, `src/lib/session.ts:5-7`)
+Risk Hints:
+- [medium] redirect loop if post-login destination points back to login or auth guard; inspect routing/session boundary (source: `src/middleware/auth.ts:3-18`)
+- [low] SSR/client mismatch if session state is checked only client-side; inspect server/client boundary (source: `src/middleware/auth.ts:3-18`, `src/lib/session.ts:5-7`)
 
 Token Budget Summary:
 - Target budget: 2200 tokens
-- ScoutPack keeps required files, commands, and risks before optional snippets.
+- ScoutPack keeps required files, commands, and risk hints before optional snippets.
 ````
 
 ## Agent Handoff
@@ -105,7 +105,7 @@ Do not edit files not listed unless you explain why.
 - Branch changes are detected locally through git.
 - Called helper `getSession` is included even though only middleware changed.
 - Test/lint/build commands are discovered but not executed.
-- Risks are grounded in selected source ranges.
+- Risk hints are documented inspection prompts grounded in selected source ranges.
 - Packet stays small enough to paste into any coding agent.
 
 ## Recording Note

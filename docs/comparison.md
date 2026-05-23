@@ -12,7 +12,7 @@ This page compares workflow fit, not product quality. Use the tool that matches 
 | Aider repo-map | give Aider enough map context while Aider edits | ScoutPack is agent-agnostic and runs before edit flow starts |
 | Cursor indexing | IDE-native codebase context and chat | ScoutPack is CLI/MCP-first, explicit, local, and portable |
 | Sourcegraph/Cody | enterprise-scale code search and graph context | ScoutPack is lightweight, local, OSS, and packet-oriented |
-| filesystem MCP servers | let agents read files on request | ScoutPack ranks files, symbols, snippets, risks, commands, and branch changes first |
+| filesystem MCP servers | let agents read files on request | ScoutPack ranks files, symbols, snippets, risk hints, commands, and branch changes first |
 
 ## ScoutPack vs Repomix
 
@@ -96,7 +96,7 @@ Use ScoutPack MCP when:
 
 - agent should ask for ranked context
 - file selection should include reasons
-- branch changes, symbols, commands, and risks matter
+- branch changes, symbols, commands, and risk hints matter
 - sensitive/generated files should be skipped before tool use
 
 Filesystem MCP gives file access. ScoutPack gives file prioritization.

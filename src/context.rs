@@ -217,7 +217,7 @@ fn required_tail(
         }
     }
 
-    tail.push_str("\nRisks:\n");
+    tail.push_str("\nRisk Hints:\n");
     let risks = risk_hints(task, results);
     if risks.is_empty() {
         tail.push_str("- Unknown from index\n");
@@ -230,7 +230,7 @@ fn required_tail(
     tail.push_str("\nToken Budget Summary:\n");
     tail.push_str(&format!("- Target budget: {budget} tokens\n"));
     tail.push_str(
-        "- ScoutPack keeps required files, commands, and risks before optional snippets.\n",
+        "- ScoutPack keeps required files, commands, and risk hints before optional snippets.\n",
     );
     tail
 }
@@ -320,24 +320,25 @@ fn risk_hints(task: &str, results: &[search::SearchResult]) -> Vec<String> {
         && !redirect_sources.is_empty()
     {
         risks.push(format!(
-            "redirect loop if post-login destination points back to login or auth guard (source: {})",
+            "[medium] redirect loop if post-login destination points back to login or auth guard; inspect routing/session boundary (source: {})",
             redirect_sources.join(", ")
         ));
     }
     if (task.contains("login") || task.contains("auth")) && !session_sources.is_empty() {
         risks.push(format!(
-            "SSR/client mismatch if session state is checked only client-side (source: {})",
+            "[low] SSR/client mismatch if session state is checked only client-side; inspect server/client boundary (source: {})",
             session_sources.join(", ")
         ));
     }
     if task.contains("env") || task.contains("secret") {
         risks.push(
-            "secret files are intentionally not indexed; verify env names manually".to_owned(),
+            "[high] secret files are intentionally not indexed; verify env names manually"
+                .to_owned(),
         );
     }
     if task.contains("test") {
         risks.push(
-            "test command exists in index, but ScoutPack does not execute project scripts"
+            "[medium] test command exists in index, but ScoutPack does not execute project scripts"
                 .to_owned(),
         );
     }
