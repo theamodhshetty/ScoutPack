@@ -13,4 +13,6 @@ jobs:
       - run: cargo fmt --check
       - run: cargo test
       - run: bash -n install.sh
+      - run: bash -n scripts/bench-real-repos.sh
+      - run: bash -n scripts/bench-one-repo.sh
       - run: sh install.sh --help

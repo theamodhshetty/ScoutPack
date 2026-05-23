@@ -142,8 +142,10 @@ Done:
 - `docs/positioning.md`
 - `docs/demo.md`
 - `docs/comparison.md`
+- `docs/benchmarks.md`
 - "ScoutPack vs Repomix/Aider/Cursor/Sourcegraph" comparison
 - real PR-review demo output
+- local repo benchmark script
 
 Remaining:
 
@@ -155,6 +157,7 @@ Acceptance:
 - README explains use case without reading roadmap
 - demo shows command, packet, and agent handoff
 - comparison is factual, not hostile
+- benchmark methodology is reproducible and honest about limits
 
 ### M13: Install And First-Run Trust
 

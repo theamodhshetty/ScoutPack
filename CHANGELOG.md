@@ -6,6 +6,7 @@ All notable ScoutPack changes are tracked here.
 
 ### Added
 
+- Benchmark methodology docs and `scripts/bench-one-repo.sh` for local repo measurement.
 - Positioning doc and launch-focused roadmap/milestone reset around ScoutPack as a context preflight layer.
 - Demo and comparison docs plus terminal-style README demo asset.
 - `WHY.md` and risk-hint documentation.
