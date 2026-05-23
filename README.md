@@ -41,7 +41,7 @@ AI coding agents are powerful, but they still burn time and tokens when they sta
 | Repo conventions get missed. | Package scripts and framework signals are included. |
 | Secret files are risky. | Sensitive patterns are skipped by default. |
 | Context grows into noise. | Packets stay under a token budget. |
-| Debugging starts from guesses. | Risks include source-backed evidence. |
+| Debugging starts from guesses. | Risk hints point to source-backed inspection areas. |
 
 ScoutPack answers one practical question before edits start:
 
@@ -50,6 +50,8 @@ What should this AI agent read first for this task?
 ```
 
 Think of ScoutPack as a local context preflight check: run it before asking an agent to edit code, review a PR, debug a failing flow, or audit a risky path.
+
+ScoutPack is most useful when you need reproducible, inspectable context across tools. Native agent search may be enough for small repos or one-off tasks. See [WHY.md](WHY.md) for where ScoutPack helps and where it does not.
 
 ## One-Minute Flow
 
@@ -80,8 +82,8 @@ Current Repo Signals:
 - test command: `vitest`
 - build command: `next build`
 
-Risks:
-- redirect loop if post-login destination points back to login or auth guard
+Risk Hints:
+- [medium] redirect loop if post-login destination points back to login or auth guard
   (source: `src/middleware/auth.ts:3-14`)
 ```
 
@@ -99,7 +101,7 @@ ScoutPack keeps the first agent prompt small and targeted: if an agent would oth
 | --- | --- |
 | Fewer wasted reads | ranked search points at likely edit files first |
 | Smaller first prompt | `context --budget` trims snippets to a fixed target |
-| Less manual setup | package scripts, framework signals, and risks are included |
+| Less manual setup | package scripts, framework signals, and risk hints are included |
 | Better dependency trail | `context --expand-calls` follows direct symbol calls |
 | Better handoff | Markdown, JSON, and MCP all expose the same local index |
 | Safer context | common secret files skipped before indexing |
@@ -111,7 +113,7 @@ ScoutPack keeps the first agent prompt small and targeted: if an agent would oth
 | Local index | SQLite + FTS5 index in `.scoutpack/` |
 | Smart scan | Respects `.gitignore`, `.scoutpackignore`, binary limits, and sensitive skips |
 | Code structure | JS/TS, Python, Rust, Go, Solidity symbols, imports, and direct call edges |
-| Task context | Token-budgeted packet with relevant files, snippets, commands, and risks |
+| Task context | Token-budgeted packet with relevant files, snippets, commands, and documented risk hints |
 | Prompt templates | Built-in bugfix, refactor, review, docs, and test prompts |
 | MCP server | Read-only `search`, `context`, `template`, `file_summary`, `symbol`, `commands`, `recent_changes`, `stats` tools |
 | Automation output | JSON mode for wrappers and scripts |
@@ -211,8 +213,8 @@ Likely Edit Areas:
 - auth/session boundary files
 - redirect and destination parameter handling
 
-Risks:
-- redirect loop if post-login destination points back to login or auth guard (source: `src/middleware/auth.ts:3-18`)
+Risk Hints:
+- [medium] redirect loop if post-login destination points back to login or auth guard (source: `src/middleware/auth.ts:3-18`)
 ```
 
 Full walkthrough: [docs/demo.md](docs/demo.md).
@@ -453,7 +455,9 @@ Security details: [SECURITY.md](SECURITY.md).
 
 - [Installation](docs/installation.md)
 - [Distribution](docs/distribution.md)
+- [Why ScoutPack](WHY.md)
 - [Positioning](docs/positioning.md)
+- [Risk hints](docs/risk-hints.md)
 - [Demo](docs/demo.md)
 - [Comparison](docs/comparison.md)
 - [MCP server](docs/mcp.md)

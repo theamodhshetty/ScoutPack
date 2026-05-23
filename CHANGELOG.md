@@ -8,6 +8,7 @@ All notable ScoutPack changes are tracked here.
 
 - Positioning doc and launch-focused roadmap/milestone reset around ScoutPack as a context preflight layer.
 - Demo and comparison docs plus terminal-style README demo asset.
+- `WHY.md` and risk-hint documentation.
 - JavaScript and JSX symbol/import extraction, including ESM imports, CommonJS requires, components, and Express-style route handlers.
 - Python and Go config expansion for `pyproject.toml`, `requirements.txt`, `Pipfile`, `setup.cfg`, and `go.mod` commands/framework signals.
 - Git-aware context flags: `--since`, `--diff`, and `--branch`, plus MCP `recent_changes`.
@@ -28,6 +29,10 @@ All notable ScoutPack changes are tracked here.
 - Efficiency model graphic and agent client setup docs for MCP, Codex, Claude Code, GitHub Copilot, Cursor, and Aider.
 - Discoverability docs for AI agent workflows, use cases, and FAQ.
 - GitHub issue templates and pull request template.
+
+### Changed
+
+- Renamed context packet `Risks` section to `Risk Hints` and added confidence labels to avoid implying static-analysis proof.
 
 ## v0.1.0 - 2026-05-12
 

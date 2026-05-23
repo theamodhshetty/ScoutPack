@@ -43,6 +43,6 @@ Commands:
 - `eslint .`
 - `next build`
 
-Risks:
-- redirect loop if post-login destination points back to login or auth guard (source: `src/middleware/auth.ts:3-14`)
-- SSR/client mismatch if session state is checked only client-side (source: `src/app/login/page.tsx:3-11`, `src/lib/session.ts:5-7`)
+Risk Hints:
+- [medium] redirect loop if post-login destination points back to login or auth guard; inspect routing/session boundary (source: `src/middleware/auth.ts:3-14`)
+- [low] SSR/client mismatch if session state is checked only client-side; inspect server/client boundary (source: `src/app/login/page.tsx:3-11`, `src/lib/session.ts:5-7`)

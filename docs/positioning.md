@@ -56,7 +56,7 @@ ScoutPack is not:
 | Aider repo-map | helping Aider navigate code while editing | ScoutPack works before any agent edits and supports multiple clients |
 | Cursor indexing | IDE-native semantic context | ScoutPack is local, explicit, CLI/MCP-friendly, and inspectable |
 | Sourcegraph/Cody-style code graph | enterprise code intelligence | ScoutPack is lightweight, local, OSS, and task-packet oriented |
-| Filesystem MCP | letting agents read files | ScoutPack ranks files, symbols, snippets, commands, risks, and recent changes |
+| Filesystem MCP | letting agents read files | ScoutPack ranks files, symbols, snippets, commands, risk hints, and recent changes |
 
 ## Target Users
 
@@ -108,7 +108,7 @@ AI coding agents fail when they read the wrong files first.
 Subhead:
 
 ```txt
-ScoutPack is a local context preflight layer that gives Claude Code, Codex, Cursor, Aider, Copilot, and MCP clients ranked files, symbols, snippets, commands, risks, and recent changes before edits start.
+ScoutPack is a local context preflight layer that gives Claude Code, Codex, Cursor, Aider, Copilot, and MCP clients ranked files, symbols, snippets, commands, documented risk hints, and recent changes before edits start.
 ```
 
 Call to action:
