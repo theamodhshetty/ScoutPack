@@ -14,6 +14,7 @@ Usage:
 
 Environment:
   SCOUTPACK_BIN=/path/to/scoutpack  Use an existing ScoutPack binary.
+  SCOUTPACK_EXPECTED_PATHS="src/a.rs;src/b.rs"  Validate expected ranked files.
 
 Measures:
   cold index, incremental index, context packet tokens, naive source-dump tokens,
@@ -33,8 +34,10 @@ if [[ ! -x "$SCOUTPACK_BIN" ]]; then
   cargo build --release --manifest-path "$ROOT/Cargo.toml"
 fi
 
-python3 - "$ROOT" "$REPO" "$TASK" "$RESULTS_PATH" "$SCOUTPACK_BIN" <<'PY'
+python3 - "$ROOT" "$REPO" "$TASK" "$RESULTS_PATH" "$SCOUTPACK_BIN" "${SCOUTPACK_EXPECTED_PATHS:-}" <<'PY'
 import datetime as dt
+import json
+import os
 import pathlib
 import shlex
 import statistics
@@ -47,6 +50,7 @@ repo = pathlib.Path(sys.argv[2]).resolve()
 task = sys.argv[3]
 results_path = pathlib.Path(sys.argv[4])
 scoutpack = pathlib.Path(sys.argv[5]).resolve()
+expected_paths = [path for path in sys.argv[6].split(";") if path]
 
 skip_dirs = {
     ".git", ".scoutpack", "node_modules", ".next", "dist", "build", "coverage",
@@ -124,15 +128,26 @@ packet_tokens = token_estimate(packet)
 naive_token_count, naive_file_count = naive_tokens(repo)
 
 search_times = []
+ranked_paths = []
 for _ in range(10):
-    elapsed_ms, _ = timed([str(scoutpack), "search", task, "--limit", "5"], repo)
+    elapsed_ms, search_output = timed(
+        [str(scoutpack), "search", task, "--limit", "20", "--json"], repo
+    )
     search_times.append(elapsed_ms)
+    if not ranked_paths:
+        seen = set()
+        for result in json.loads(search_output)["results"]:
+            path = result["path"]
+            if path not in seen:
+                seen.add(path)
+                ranked_paths.append(path)
 p50 = statistics.median(search_times)
 p95 = sorted(search_times)[int(len(search_times) * 0.95) - 1]
 
 now = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 commit = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], cwd=root, text=True).strip()
 reduction = (naive_token_count / packet_tokens) if packet_tokens else 0
+host = subprocess.check_output(["uname", "-srm"], text=True).strip()
 
 lines = [
     "# ScoutPack Local Benchmark",
@@ -141,6 +156,7 @@ lines = [
     f"Repo: `{repo}`",
     f"Task: `{task}`",
     f"ScoutPack commit: `{commit}`",
+    f"Environment: `{host}` / {os.cpu_count()} logical CPUs",
     "",
     "| Metric | Value |",
     "| --- | ---: |",
@@ -154,16 +170,35 @@ lines = [
     f"| Packet tokens | {packet_tokens:,} |",
     f"| Naive source/config/docs files | {naive_file_count:,} |",
     f"| Naive source/config/docs tokens | {naive_token_count:,} |",
-    f"| Token reduction | {reduction:.1f}x |",
+    f"| Broad-context compression | {reduction:.1f}x |",
     f"| Search p50 | {p50:.1f}ms |",
     f"| Search p95 | {p95:.1f}ms |",
     "",
     "## Notes",
     "",
     "- Naive baseline counts UTF-8 source/config/docs files and skips common generated folders.",
+    "- Token counts use ScoutPack's approximation, not a model tokenizer.",
     "- ScoutPack does not execute project commands.",
     "- This measures context size and speed, not model edit correctness.",
+    "- Compression without relevant-file retrieval is not an efficiency win.",
+    "",
+    "## Ranked Files",
+    "",
 ]
+if ranked_paths:
+    lines.extend(f"{index}. `{path}`" for index, path in enumerate(ranked_paths[:5], 1))
+else:
+    lines.append("No ranked files returned.")
+
+if expected_paths:
+    expected = set(expected_paths)
+    lines.extend(["", "## Expected-File Check", ""])
+    for limit in (1, 3, 5):
+        hit = any(path in expected for path in ranked_paths[:limit])
+        lines.append(f"- Top-{limit}: {'hit' if hit else 'miss'}")
+    hits = len(expected.intersection(ranked_paths[:5]))
+    lines.append(f"- Expected coverage @5: {hits}/{len(expected)}")
+    lines.append("- Expected paths: " + ", ".join(f"`{path}`" for path in expected_paths))
 results_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 print(results_path)
 PY

@@ -95,7 +95,7 @@ No cloud. No API key. No telemetry. No auto-edits. No project command execution.
   <img src="assets/scoutpack-efficiency.svg" width="760" alt="ScoutPack efficiency model">
 </p>
 
-ScoutPack keeps the first agent prompt small and targeted: if an agent would otherwise read broad files and chat history before finding the right area, ScoutPack lets you start from a focused packet such as `--budget 2500`. Reproducible numbers live in [benches/RESULTS.md](benches/RESULTS.md), with methodology in [docs/benchmarks.md](docs/benchmarks.md).
+ScoutPack keeps the first agent prompt small and targeted: if an agent would otherwise read broad files and chat history before finding the right area, ScoutPack lets you start from a focused packet such as `--budget 2500`. Reproducible results report compression beside Top-1/3/5 retrieval quality in [benches/RESULTS.md](benches/RESULTS.md), with methodology in [docs/benchmarks.md](docs/benchmarks.md).
 
 | Efficiency lever | How ScoutPack helps |
 | --- | --- |
@@ -111,6 +111,8 @@ Run the same measurement on your own repo:
 ```bash
 scripts/bench-one-repo.sh /path/to/repo "review my PR" /tmp/scoutpack-benchmark.md
 ```
+
+Small packet alone is not success. Benchmark passes only when expected files rank near top.
 
 ## What You Get
 

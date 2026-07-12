@@ -13,28 +13,29 @@ if [[ ! -x "$SCOUTPACK_BIN" ]]; then
 fi
 
 repos=(
-  "next-learn|https://github.com/vercel/next-learn.git|fix auth page routing|auth middleware"
-  "full-stack-fastapi-template|https://github.com/fastapi/full-stack-fastapi-template.git|add validation to API endpoint|validation users"
-  "hyperfine|https://github.com/sharkdp/hyperfine.git|improve CLI command parsing|command option"
-  "chi|https://github.com/go-chi/chi.git|find middleware routing bug|middleware route"
-  "changesets|https://github.com/changesets/changesets.git|update package release workflow|package release"
+  "next-learn|https://github.com/vercel/next-learn.git|914a33426aac20f825ca52fae80b889302b92240|fix NextAuth login redirect flow|fix NextAuth login redirect flow|dashboard/final-example/app/ui/login-form.tsx;dashboard/final-example/app/login/page.tsx;dashboard/final-example/auth.config.ts"
+  "full-stack-fastapi-template|https://github.com/fastapi/full-stack-fastapi-template.git|13652b51ea0acca7dfe243ac25e2bbdc066f3c4f|fix user registration validation|fix user registration validation|backend/app/api/routes/users.py;backend/app/models.py;backend/tests/api/routes/test_users.py"
+  "hyperfine|https://github.com/sharkdp/hyperfine.git|f12f3d9f86f3643b3b7deace5e160b1f0f44d2b7|improve shell command option parsing|improve shell command option parsing|src/command.rs;src/cli.rs;src/options.rs"
+  "chi|https://github.com/go-chi/chi.git|a54874f0e2f12647a19e82ee70dfa8185014100c|fix route headers middleware matching bug|fix route headers middleware matching bug|middleware/route_headers.go;middleware/route_headers_test.go"
+  "changesets|https://github.com/changesets/changesets.git|372523f4c2ee4ffeb8330d444d47ffb6d0af5126|fix apply release plan package update|fix apply release plan package update|packages/apply-release-plan/src/index.ts;packages/apply-release-plan/src/index.test.ts;packages/apply-release-plan/src/version-package.ts"
 )
 
 for spec in "${repos[@]}"; do
-  IFS='|' read -r name url _task _query <<<"$spec"
+  IFS='|' read -r name url commit _task _query _expected <<<"$spec"
   dest="$BENCH_ROOT/$name"
   if [[ ! -d "$dest/.git" ]]; then
     rm -rf "$dest"
-    git clone --depth 1 "$url" "$dest"
-  else
-    git -C "$dest" fetch --depth 1 origin >/dev/null 2>&1 || true
+    git clone --no-checkout "$url" "$dest"
   fi
+  git -C "$dest" fetch --depth 1 origin "$commit"
+  git -C "$dest" checkout --detach --force "$commit"
 done
 
 python3 - "$ROOT" "$BENCH_ROOT" "$RESULTS_PATH" "$SCOUTPACK_BIN" "${repos[@]}" <<'PY'
 import datetime as dt
 import json
 import os
+import platform
 import pathlib
 import shlex
 import statistics
@@ -46,7 +47,7 @@ root = pathlib.Path(sys.argv[1])
 bench_root = pathlib.Path(sys.argv[2])
 results_path = pathlib.Path(sys.argv[3])
 scoutpack = pathlib.Path(sys.argv[4])
-repo_specs = [arg.split("|", 3) for arg in sys.argv[5:]]
+repo_specs = [arg.split("|", 5) for arg in sys.argv[5:]]
 
 skip_dirs = {
     ".git", ".scoutpack", "node_modules", ".next", "dist", "build", "coverage",
@@ -121,8 +122,14 @@ def generated_skipped(repo: pathlib.Path) -> str:
     return "yes" if not leaked else "no"
 
 rows = []
-for name, url, task, query in repo_specs:
+for name, url, expected_commit, task, query, expected_raw in repo_specs:
     repo = bench_root / name
+    repo_commit = subprocess.check_output(
+        ["git", "rev-parse", "HEAD"], cwd=repo, text=True
+    ).strip()
+    if repo_commit != expected_commit:
+        raise RuntimeError(f"{name}: expected {expected_commit}, got {repo_commit}")
+    expected_paths = expected_raw.split(";")
     subprocess.run([str(scoutpack), "init"], cwd=repo, check=True, stdout=subprocess.DEVNULL)
     subprocess.run(["rm", "-rf", ".scoutpack"], cwd=repo, check=True)
     subprocess.run([str(scoutpack), "init"], cwd=repo, check=True, stdout=subprocess.DEVNULL)
@@ -136,11 +143,27 @@ for name, url, task, query in repo_specs:
     naive = naive_tokens(repo)
 
     search_times = []
+    ranked_paths = []
     for _ in range(20):
-        elapsed_ms, _ = timed([str(scoutpack), "search", query, "--limit", "5"], repo)
+        elapsed_ms, search_output = timed(
+            [str(scoutpack), "search", query, "--limit", "20", "--json"], repo
+        )
         search_times.append(elapsed_ms)
+        if not ranked_paths:
+            seen = set()
+            for result in json.loads(search_output)["results"]:
+                path = result["path"]
+                if path not in seen:
+                    seen.add(path)
+                    ranked_paths.append(path)
     p50 = statistics.median(search_times)
     p95 = sorted(search_times)[int(len(search_times) * 0.95) - 1]
+    expected_set = set(expected_paths)
+    hit_at = {
+        limit: any(path in expected_set for path in ranked_paths[:limit])
+        for limit in (1, 3, 5)
+    }
+    expected_hits_at_5 = len(expected_set.intersection(ranked_paths[:5]))
 
     rows.append({
         "name": name,
@@ -156,41 +179,85 @@ for name, url, task, query in repo_specs:
         "reused": incremental["reused"],
         "generated_skipped": generated_skipped(repo),
         "url": url,
+        "commit": repo_commit,
+        "task": task,
+        "ranked_paths": ranked_paths,
+        "expected_paths": expected_paths,
+        "hit_at": hit_at,
+        "expected_hits_at_5": expected_hits_at_5,
     })
 
 now = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 commit = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], cwd=root, text=True).strip()
+rust_version = subprocess.check_output(["rustc", "--version"], text=True).strip()
+host = subprocess.check_output(["uname", "-srm"], text=True).strip()
 lines = [
     "# ScoutPack Benchmark Results",
     "",
     f"Generated: {now}",
     f"ScoutPack commit: `{commit}`",
+    f"Environment: `{host}` / {os.cpu_count()} logical CPUs",
+    f"Toolchain: `{rust_version}` / `Python {platform.python_version()}`",
     "",
-    "Methodology:",
-    "- `scripts/bench-real-repos.sh` clones each public repo with `--depth 1`.",
+    "## Methodology",
+    "",
+    "- `scripts/bench-real-repos.sh` checks out pinned public-repo commits.",
     "- Cold index removes `.scoutpack`, runs `scoutpack init`, then `scoutpack pack .`.",
     "- Incremental re-pack runs `scoutpack pack .` again without file changes.",
-    "- Packet tokens use ScoutPack's approximation: `(chars + words) / 4 + 1`.",
-    "- Naive tokens count UTF-8 source/config/docs files under supported extensions while skipping generated and sensitive default folders.",
-    "- Search latency runs 20 searches per repo and reports p50/p95 wall-clock time.",
+    "- Packet and broad-baseline tokens use ScoutPack's approximation: `(chars + words) / 4 + 1`; this is not a model tokenizer.",
+    "- Broad-baseline tokens count UTF-8 source/config/docs files under supported extensions while skipping generated and sensitive default folders.",
+    "- Search latency runs 20 JSON searches per repo and reports p50/p95 wall-clock time.",
+    "- Expected files are hand-authored inspection targets for each pinned task. Top-K is measured over unique ranked paths.",
     "",
-    "| Repo | Cold index | Incremental re-pack | Files scanned | Files skipped | Generated ignored | Packet tokens | Naive tokens | Reduction | Search p50 | Search p95 |",
-    "| --- | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: |",
+    "## Efficiency",
+    "",
+    "Compression ratio compares broad source context with a task packet. It does not prove answer quality; retrieval table below checks whether expected files appear.",
+    "",
+    "| Repo | Commit | Cold | Incremental | Indexed | Skipped | Generated ignored | Packet tokens | Broad tokens | Compression | Search p50/p95 |",
+    "| --- | --- | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: |",
 ]
 for row in rows:
     lines.append(
         f"| [{row['name']}]({row['url']}) | "
+        f"`{row['commit'][:7]}` | "
         f"{row['cold_ms'] / 1000:.2f}s | "
         f"{row['incremental_ms'] / 1000:.2f}s | "
         f"{row['files']} | {row['skipped']} | {row['generated_skipped']} | "
         f"{row['packet_tokens']:,} | {row['naive_tokens']:,} | "
-        f"{row['reduction']:.1f}x | {row['p50']:.1f}ms | {row['p95']:.1f}ms |"
+        f"{row['reduction']:.1f}x | {row['p50']:.1f}/{row['p95']:.1f}ms |"
     )
 lines.extend([
     "",
-    "Interpretation:",
-    "- These are workflow benchmarks, not academic retrieval benchmarks.",
+    "## Retrieval Quality",
+    "",
+    "Top-K means at least one expected file appears among first K unique paths. Coverage reports expected files found in first five paths.",
+    "",
+    "| Repo | Task | Top-1 | Top-3 | Top-5 | Expected coverage @5 |",
+    "| --- | --- | ---: | ---: | ---: | ---: |",
+])
+for row in rows:
+    lines.append(
+        f"| {row['name']} | {row['task']} | "
+        f"{'yes' if row['hit_at'][1] else 'no'} | "
+        f"{'yes' if row['hit_at'][3] else 'no'} | "
+        f"{'yes' if row['hit_at'][5] else 'no'} | "
+        f"{row['expected_hits_at_5']}/{len(row['expected_paths'])} |"
+    )
+lines.extend([
+    "",
+    "Expected files:",
+])
+for row in rows:
+    expected = ", ".join(f"`{path}`" for path in row["expected_paths"])
+    lines.append(f"- **{row['name']}**: {expected}")
+lines.extend([
+    "",
+    "## Interpretation",
+    "",
+    "- These are deterministic context-selection benchmarks, not model-edit benchmarks.",
     "- Results vary by hardware, filesystem cache, repo checkout shape, and git/network state.",
+    "- Small packets with retrieval misses are failures, not efficiency wins.",
+    "- Hand-authored expected files can be incomplete; review benchmark tasks and targets when pinned repos change.",
     "- ScoutPack does not run project commands during measurement.",
 ])
 results_path.write_text("\n".join(lines) + "\n", encoding="utf-8")

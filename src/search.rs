@@ -435,7 +435,7 @@ fn source_file_boost(path: &str) -> f64 {
     let lower = path.to_ascii_lowercase();
     if matches!(
         Path::new(&lower).extension().and_then(|ext| ext.to_str()),
-        Some("ts" | "tsx" | "js" | "jsx" | "mjs" | "cjs")
+        Some("ts" | "tsx" | "js" | "jsx" | "mjs" | "cjs" | "py" | "rs" | "go" | "sol")
     ) {
         1.2
     } else if lower.ends_with("package.json") {
@@ -603,4 +603,32 @@ fn normalize_path(path: &Path) -> String {
     PathBuf::from_iter(parts)
         .to_string_lossy()
         .replace('\\', "/")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn source_boost_covers_every_supported_code_language() {
+        for path in [
+            "src/app.ts",
+            "src/app.tsx",
+            "src/app.js",
+            "src/app.jsx",
+            "src/app.mjs",
+            "src/app.cjs",
+            "src/app.py",
+            "src/app.rs",
+            "src/app.go",
+            "src/app.sol",
+        ] {
+            assert_eq!(source_file_boost(path), 1.2, "missing boost for {path}");
+        }
+    }
+
+    #[test]
+    fn source_boost_does_not_treat_docs_as_code() {
+        assert_eq!(source_file_boost("docs/search.md"), 0.0);
+    }
 }
