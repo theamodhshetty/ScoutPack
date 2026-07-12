@@ -266,12 +266,60 @@ pub fn expand_call_graph(
 }
 
 pub fn query_terms(query: &str) -> Vec<String> {
-    query
+    let raw_terms = query
         .split(|ch: char| !ch.is_ascii_alphanumeric() && ch != '_')
         .map(str::trim)
         .filter(|term| term.len() >= 2)
         .map(|term| term.to_ascii_lowercase())
-        .collect()
+        .filter(|term| !is_task_verb(term))
+        .collect::<Vec<_>>();
+    let mut terms = Vec::new();
+    for term in raw_terms {
+        if !terms.contains(&term) {
+            terms.push(term.clone());
+        }
+        for variant in coding_term_variants(&term) {
+            let variant = (*variant).to_owned();
+            if !terms.contains(&variant) {
+                terms.push(variant);
+            }
+        }
+    }
+    terms
+}
+
+fn is_task_verb(term: &str) -> bool {
+    matches!(
+        term,
+        "add"
+            | "change"
+            | "create"
+            | "debug"
+            | "find"
+            | "fix"
+            | "improve"
+            | "implement"
+            | "refactor"
+            | "review"
+            | "update"
+    )
+}
+
+fn coding_term_variants(term: &str) -> &'static [&'static str] {
+    match term {
+        "authentication" => &["authenticate", "auth"],
+        "authorization" => &["authorize", "auth"],
+        "configuration" => &["config"],
+        "deserialization" => &["deserialize"],
+        "initialization" => &["initialize", "init"],
+        "migration" => &["migrate"],
+        "navigation" => &["navigate"],
+        "pagination" => &["paginate"],
+        "registration" => &["register"],
+        "serialization" => &["serialize"],
+        "validation" => &["validate"],
+        _ => &[],
+    }
 }
 
 #[derive(Debug)]
@@ -435,7 +483,7 @@ fn source_file_boost(path: &str) -> f64 {
     let lower = path.to_ascii_lowercase();
     if matches!(
         Path::new(&lower).extension().and_then(|ext| ext.to_str()),
-        Some("ts" | "tsx" | "js" | "jsx" | "mjs" | "cjs")
+        Some("ts" | "tsx" | "js" | "jsx" | "mjs" | "cjs" | "py" | "rs" | "go" | "sol")
     ) {
         1.2
     } else if lower.ends_with("package.json") {
@@ -603,4 +651,40 @@ fn normalize_path(path: &Path) -> String {
     PathBuf::from_iter(parts)
         .to_string_lossy()
         .replace('\\', "/")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn source_boost_covers_every_supported_code_language() {
+        for path in [
+            "src/app.ts",
+            "src/app.tsx",
+            "src/app.js",
+            "src/app.jsx",
+            "src/app.mjs",
+            "src/app.cjs",
+            "src/app.py",
+            "src/app.rs",
+            "src/app.go",
+            "src/app.sol",
+        ] {
+            assert_eq!(source_file_boost(path), 1.2, "missing boost for {path}");
+        }
+    }
+
+    #[test]
+    fn source_boost_does_not_treat_docs_as_code() {
+        assert_eq!(source_file_boost("docs/search.md"), 0.0);
+    }
+
+    #[test]
+    fn query_terms_remove_task_verbs_and_add_coding_variants() {
+        assert_eq!(
+            query_terms("fix user registration validation"),
+            vec!["user", "registration", "register", "validation", "validate"]
+        );
+    }
 }

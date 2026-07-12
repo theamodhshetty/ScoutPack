@@ -6,6 +6,7 @@ All notable ScoutPack changes are tracked here.
 
 ### Added
 
+- Pinned real-repo retrieval benchmarks with Top-1/3/5 hits and expected-file coverage.
 - Benchmark methodology docs and `scripts/bench-one-repo.sh` for local repo measurement.
 - Positioning doc and launch-focused roadmap/milestone reset around ScoutPack as a context preflight layer.
 - Demo and comparison docs plus terminal-style README demo asset.
@@ -33,6 +34,10 @@ All notable ScoutPack changes are tracked here.
 
 ### Changed
 
+- Benchmark reports now separate packet compression from retrieval quality and include host/toolchain metadata.
+- Source ranking boost now applies consistently to Python, Rust, Go, and Solidity, not only JavaScript/TypeScript.
+- Task query normalization removes generic edit verbs and maps common coding nouns such as `registration` to symbol forms such as `register`.
+- Context snippet admission now honors requested token budget instead of allowing 10% overhead.
 - Renamed context packet `Risks` section to `Risk Hints` and added confidence labels to avoid implying static-analysis proof.
 
 ## v0.1.0 - 2026-05-12

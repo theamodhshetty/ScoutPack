@@ -141,7 +141,7 @@ pub fn build_context_packet_with_options(
                 result.path, result.start_line, result.end_line, text
             );
             let candidate = format!("{prefix}{snippet_section}{block}{suffix}");
-            if token_budget::estimate_tokens(&candidate) <= budget + (budget / 10) {
+            if token_budget::estimate_tokens(&candidate) <= budget {
                 snippet_section.push_str(&block);
                 added += 1;
             }
@@ -152,7 +152,7 @@ pub fn build_context_packet_with_options(
     }
 
     let with_snippets = format!("{prefix}{snippet_section}{suffix}");
-    if token_budget::fits(&with_snippets, budget + (budget / 10)) {
+    if token_budget::fits(&with_snippets, budget) {
         Ok(with_snippets)
     } else {
         Ok(format!(

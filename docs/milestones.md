@@ -146,6 +146,7 @@ Done:
 - "ScoutPack vs Repomix/Aider/Cursor/Sourcegraph" comparison
 - real PR-review demo output
 - local repo benchmark script
+- pinned real-repo tasks with Top-1/3/5 expected-file checks
 
 Remaining:
 
@@ -158,6 +159,7 @@ Acceptance:
 - demo shows command, packet, and agent handoff
 - comparison is factual, not hostile
 - benchmark methodology is reproducible and honest about limits
+- efficiency claims pair packet compression with retrieval quality
 
 ### M13: Install And First-Run Trust
 

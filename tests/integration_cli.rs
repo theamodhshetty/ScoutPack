@@ -207,6 +207,11 @@ fn init_pack_search_context_stats_work() {
     let context_json_value: serde_json::Value =
         serde_json::from_slice(&context_json.stdout).unwrap();
     assert_eq!(context_json_value["task"], "fix login redirect loop");
+    assert!(
+        context_json_value["estimated_tokens"].as_u64().unwrap() <= 2000,
+        "{}",
+        context_json_value["estimated_tokens"]
+    );
     assert!(context_json_value["packet"]
         .as_str()
         .unwrap()

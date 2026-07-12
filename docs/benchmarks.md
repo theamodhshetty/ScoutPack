@@ -1,10 +1,10 @@
 # Benchmarks
 
-ScoutPack benchmarks answer one narrow question:
+ScoutPack benchmarks answer two narrow questions:
 
-> How much smaller and faster is a task-specific ScoutPack packet than broad repo context?
+> How much smaller is a task-specific packet, and did ScoutPack rank expected files?
 
-They do not claim an AI model will always produce a better edit. Edit quality depends on model, prompt, repo, tests, and user review. ScoutPack measures context selection, packet size, indexing time, and search latency.
+Compression without relevant-file retrieval is not useful efficiency. Results therefore report speed and packet size beside Top-1, Top-3, Top-5, and expected-file coverage. They do not claim an AI model will always produce a better edit. Edit quality depends on model, prompt, repo, tests, and user review.
 
 ## What We Measure
 
@@ -17,12 +17,14 @@ They do not claim an AI model will always produce a better edit. Edit quality de
 | Reduction | `naive tokens / packet tokens` |
 | Search latency | repeated `scoutpack search` wall-clock time |
 | Skipped files | files ignored by scanner rules, `.gitignore`, `.scoutpackignore`, binary checks, or sensitive patterns |
+| Top-K hit | whether at least one hand-authored expected file appears in first K unique ranked paths |
+| Expected coverage @5 | expected files found among first five unique ranked paths |
 
 Current reproducible results live in [benches/RESULTS.md](../benches/RESULTS.md).
 
 ## Run Real-Repo Benchmark
 
-This clones representative public repos into `.scoutpack-bench-repos/`, builds ScoutPack, and writes `benches/RESULTS.md`.
+This checks out pinned commits from representative public repos into `.scoutpack-bench-repos/`, builds ScoutPack, and writes `benches/RESULTS.md`.
 
 ```bash
 scripts/bench-real-repos.sh
@@ -59,6 +61,15 @@ It measures:
 
 It does not execute project commands and does not make network calls.
 
+Add expected paths to validate retrieval quality:
+
+```bash
+SCOUTPACK_EXPECTED_PATHS="src/auth.ts;tests/auth.test.ts" \
+  scripts/bench-one-repo.sh /path/to/repo "fix login redirect" /tmp/scoutpack-local-benchmark.md
+```
+
+Expected paths use repo-relative exact matches separated by semicolons.
+
 ## Comparison Baselines
 
 ScoutPack should be compared against workflow alternatives, not strawmen.
@@ -78,7 +89,7 @@ ScoutPack should win only where explicit, portable, local, task-specific context
 Good benchmark result:
 
 - packet stays near requested budget
-- selected files match likely edit/review areas
+- Top-1/3/5 and expected coverage show selected files match likely edit/review areas
 - generated and sensitive files stay skipped
 - incremental pack is fast enough to rerun often
 - output gives useful agent handoff without full repo dump
@@ -91,4 +102,4 @@ Bad benchmark result:
 - generated folders leak into index
 - command needs too much manual ceremony
 
-When publishing results, include repo, commit, task prompt, ScoutPack commit, OS, CPU, and exact command.
+Token counts use ScoutPack's approximation, not a model-specific tokenizer. When publishing results, include repo commit, task prompt, expected files, ScoutPack commit, OS/architecture, toolchain, and exact command.
