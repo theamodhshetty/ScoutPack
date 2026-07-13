@@ -2,6 +2,7 @@ mod chunk;
 mod cli;
 mod config;
 mod context;
+mod doctor;
 mod git;
 mod index;
 mod mcp;
@@ -46,7 +47,11 @@ async fn main() -> Result<()> {
                 summary.files_removed,
                 summary.chunks_indexed,
                 summary.embeddings_indexed,
-                summary.files_skipped
+                summary.files_skipped,
+            );
+            println!(
+                "Read {} files; reused {} metadata fingerprints.",
+                summary.files_read, summary.metadata_reused
             );
             println!("Index: {}", summary.index_path.display());
         }
@@ -60,7 +65,9 @@ async fn main() -> Result<()> {
             json,
             semantic,
             semantic_alpha,
+            no_refresh,
         } => {
+            refresh_index(".", no_refresh)?;
             let results = search::search_current_dir_with_options(
                 &query,
                 limit,
@@ -87,7 +94,9 @@ async fn main() -> Result<()> {
             semantic,
             semantic_alpha,
             expand_calls,
+            no_refresh,
         } => {
+            refresh_index(".", no_refresh)?;
             let git_mode = context_git_mode(since, diff, branch)?;
             let packet = context::build_context_packet_with_options(
                 ".",
@@ -115,7 +124,9 @@ async fn main() -> Result<()> {
             since,
             diff,
             branch,
+            no_refresh,
         } => {
+            refresh_index(".", no_refresh)?;
             let git_mode = context_git_mode(since, diff, branch)?;
             let prompt = templates::render_prompt(
                 ".",
@@ -134,7 +145,20 @@ async fn main() -> Result<()> {
                 print!("{prompt}");
             }
         }
-        Commands::Stats { path, json } => {
+        Commands::Doctor { path, json, fix } => {
+            let report = doctor::diagnose(&path, fix)?;
+            if json {
+                println!("{}", serde_json::to_string_pretty(&report)?);
+            } else {
+                doctor::print_report(&report);
+            }
+        }
+        Commands::Stats {
+            path,
+            json,
+            no_refresh,
+        } => {
+            refresh_index(&path, no_refresh)?;
             let stats = index::read_stats(&path)?;
             if json {
                 output::print_stats_json(&stats)?;
@@ -161,6 +185,21 @@ async fn main() -> Result<()> {
         }
     }
 
+    Ok(())
+}
+
+fn refresh_index(root: impl AsRef<std::path::Path>, no_refresh: bool) -> Result<()> {
+    if no_refresh {
+        return Ok(());
+    }
+    let summary = index::pack_repo_with_options(root.as_ref(), index::PackOptions::default())?;
+    tracing::debug!(
+        indexed = summary.files_indexed,
+        reused = summary.files_reused,
+        read = summary.files_read,
+        metadata_reused = summary.metadata_reused,
+        "refreshed local index"
+    );
     Ok(())
 }
 

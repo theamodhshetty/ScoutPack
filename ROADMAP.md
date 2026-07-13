@@ -81,7 +81,7 @@ Goal: make ScoutPack easy to try and easy to trust.
 - prepare crates.io publish checklist
 - add Homebrew tap instructions
 - investigate optional `npx scoutpack` wrapper
-- add `scoutpack doctor` for index health, repo signals, and install sanity
+- validate the shipped `scoutpack doctor` across release binaries
 
 ### P2: Agent Adoption
 
@@ -104,7 +104,7 @@ Goal: make ScoutPack easy to try and easy to trust.
 
 Goal: make ScoutPack more useful on real work branches.
 
-- `scoutpack doctor`
+- metadata-aware automatic index refresh is shipped; benchmark it on larger monorepos
 - `scoutpack explain <file>`
 - `scoutpack eval`
 - better monorepo/workspace summaries

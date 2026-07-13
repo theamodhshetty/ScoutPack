@@ -65,6 +65,10 @@ pub enum Commands {
         /// Weight for semantic score in hybrid ranking.
         #[arg(long, default_value_t = 0.45)]
         semantic_alpha: f64,
+
+        /// Query the existing index without checking the repository for changes.
+        #[arg(long, default_value_t = false)]
+        no_refresh: bool,
     },
 
     /// Build a compact task-specific markdown context packet.
@@ -103,6 +107,10 @@ pub enum Commands {
         /// Follow direct symbol calls from matched symbols by N hops.
         #[arg(long, default_value_t = 0)]
         expand_calls: usize,
+
+        /// Use the existing index without checking the repository for changes.
+        #[arg(long, default_value_t = false)]
+        no_refresh: bool,
     },
 
     /// Render an agent-ready prompt from a named template and ScoutPack context.
@@ -128,6 +136,24 @@ pub enum Commands {
         /// Scope context to files changed on the current branch against main.
         #[arg(long, default_value_t = false)]
         branch: bool,
+
+        /// Use the existing index without checking the repository for changes.
+        #[arg(long, default_value_t = false)]
+        no_refresh: bool,
+    },
+
+    /// Diagnose index health, freshness, language coverage, and repository signals.
+    Doctor {
+        #[arg(default_value = ".")]
+        path: PathBuf,
+
+        /// Print a stable machine-readable report.
+        #[arg(long, default_value_t = false)]
+        json: bool,
+
+        /// Build or refresh the local index before reporting health.
+        #[arg(long, default_value_t = false)]
+        fix: bool,
     },
 
     /// Show index stats.
@@ -137,6 +163,10 @@ pub enum Commands {
 
         #[arg(long, default_value_t = false)]
         json: bool,
+
+        /// Use the existing index without checking the repository for changes.
+        #[arg(long, default_value_t = false)]
+        no_refresh: bool,
     },
 
     /// Start a read-only MCP server over an existing ScoutPack index.

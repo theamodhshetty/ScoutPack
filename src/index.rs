@@ -13,7 +13,7 @@ const INDEX_DIR: &str = ".scoutpack";
 const DB_FILE: &str = "pack.sqlite";
 const MANIFEST_FILE: &str = "manifest.json";
 const REPO_MAP_FILE: &str = "repo-map.md";
-const SCHEMA_VERSION: i64 = 4;
+pub const SCHEMA_VERSION: i64 = 5;
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct PackOptions {
@@ -21,7 +21,7 @@ pub struct PackOptions {
     pub allow_model_download: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct PackSummary {
     pub files_indexed: usize,
     pub files_reused: usize,
@@ -29,7 +29,24 @@ pub struct PackSummary {
     pub chunks_indexed: usize,
     pub embeddings_indexed: usize,
     pub files_skipped: usize,
+    pub files_read: usize,
+    pub metadata_reused: usize,
     pub index_path: PathBuf,
+}
+
+#[derive(Debug, Serialize)]
+pub struct IndexFreshness {
+    pub changed_files: usize,
+    pub removed_files: usize,
+    pub config_changed: bool,
+    pub files_read: usize,
+    pub metadata_reused: usize,
+}
+
+#[derive(Debug, Serialize)]
+pub struct LanguageCount {
+    pub language: String,
+    pub files: i64,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -42,6 +59,8 @@ pub struct Manifest {
     pub file_count: usize,
     pub skipped_count: usize,
     pub current_git_branch: Option<String>,
+    #[serde(default)]
+    pub git_head: Option<String>,
     pub recent_changed_files: Vec<String>,
     pub recent_commit_subjects: Vec<String>,
 }
@@ -122,9 +141,6 @@ pub fn pack_repo_with_options(root: &Path, options: PackOptions) -> Result<PackS
         anyhow::bail!("Path does not exist: {}", root.display());
     }
     let root = root.canonicalize()?;
-    let config = config::load(&root)?;
-    let scan = scanner::scan_repo(&root, &config)?;
-
     let scout_dir = root.join(INDEX_DIR);
     fs::create_dir_all(&scout_dir)?;
     let db_path = scout_dir.join(DB_FILE);
@@ -133,6 +149,30 @@ pub fn pack_repo_with_options(root: &Path, options: PackOptions) -> Result<PackS
     ensure_schema(&conn)?;
 
     let existing = existing_files(&conn)?;
+    let cache = existing
+        .iter()
+        .map(|(path, file)| {
+            (
+                path.clone(),
+                scanner::CachedFileMetadata {
+                    language: file.language.clone(),
+                    kind: file.kind.clone(),
+                    size_bytes: file.size_bytes,
+                    hash: file.hash.clone(),
+                    mtime_ns: file.mtime_ns,
+                },
+            )
+        })
+        .collect();
+    let config = config::load(&root)?;
+    let scan = scanner::scan_repo_with_cache(&root, &config, &cache)?;
+    let existing_skipped = existing_skipped_files(&conn)?;
+    let scanned_skipped: HashSet<(String, String)> = scan
+        .skipped
+        .iter()
+        .map(|file| (file.path.clone(), file.reason.clone()))
+        .collect();
+    let skipped_changed = existing_skipped != scanned_skipped;
     let scan_paths: HashSet<&str> = scan
         .files
         .iter()
@@ -142,20 +182,25 @@ pub fn pack_repo_with_options(root: &Path, options: PackOptions) -> Result<PackS
         .keys()
         .filter(|path| !scan_paths.contains(path.as_str()))
         .count();
+    let scanned_by_path: HashMap<&str, &scanner::ScannedFile> = scan
+        .files
+        .iter()
+        .map(|file| (file.rel_path.as_str(), file))
+        .collect();
 
     let indexed_at = now_unix();
     let tx = conn.transaction()?;
-    tx.execute("DELETE FROM skipped_files", [])?;
+    if skipped_changed {
+        tx.execute("DELETE FROM skipped_files", [])?;
+    }
 
     let mut chunks_indexed = 0usize;
     let mut files_indexed = 0usize;
     let mut files_reused = 0usize;
 
     for (path, existing_file) in &existing {
-        let changed = scan
-            .files
-            .iter()
-            .find(|file| file.rel_path == *path)
+        let changed = scanned_by_path
+            .get(path.as_str())
             .is_some_and(|file| file.hash != existing_file.hash);
         let removed = !scan_paths.contains(path.as_str());
         if changed || removed {
@@ -164,26 +209,44 @@ pub fn pack_repo_with_options(root: &Path, options: PackOptions) -> Result<PackS
     }
 
     for file in &scan.files {
-        if existing
-            .get(&file.rel_path)
-            .is_some_and(|existing_file| existing_file.hash == file.hash)
-        {
-            files_reused += 1;
-            continue;
+        if let Some(existing_file) = existing.get(&file.rel_path) {
+            if existing_file.hash == file.hash {
+                if existing_file.language != file.language
+                    || existing_file.kind != file.kind
+                    || existing_file.size_bytes != file.size_bytes
+                    || existing_file.mtime_ns != file.mtime_ns
+                {
+                    tx.execute(
+                        "UPDATE files
+                         SET language = ?1, kind = ?2, size_bytes = ?3, mtime_ns = ?4
+                         WHERE id = ?5",
+                        params![
+                            file.language,
+                            file.kind,
+                            file.size_bytes as i64,
+                            file.mtime_ns,
+                            existing_file.id
+                        ],
+                    )?;
+                }
+                files_reused += 1;
+                continue;
+            }
         }
 
         chunks_indexed += insert_scanned_file(&tx, file, indexed_at)?;
         files_indexed += 1;
     }
 
-    for skipped in &scan.skipped {
-        tx.execute(
-            "INSERT INTO skipped_files (path, reason) VALUES (?1, ?2)",
-            params![skipped.path, skipped.reason],
-        )?;
+    if skipped_changed {
+        for skipped in &scan.skipped {
+            tx.execute(
+                "INSERT INTO skipped_files (path, reason) VALUES (?1, ?2)",
+                params![skipped.path, skipped.reason],
+            )?;
+        }
     }
     tx.commit()?;
-    rebuild_fts(&conn)?;
     let embeddings_indexed = if options.embed {
         semantic::embed_missing_chunks(&conn, options.allow_model_download)?
     } else {
@@ -199,6 +262,7 @@ pub fn pack_repo_with_options(root: &Path, options: PackOptions) -> Result<PackS
         file_count: scan.files.len(),
         skipped_count: scan.skipped.len(),
         current_git_branch: git::current_branch(&root),
+        git_head: git::head_commit(&root),
         recent_changed_files: git::recent_changed_files(&root),
         recent_commit_subjects: git::recent_commit_subjects(&root),
     };
@@ -218,6 +282,8 @@ pub fn pack_repo_with_options(root: &Path, options: PackOptions) -> Result<PackS
         chunks_indexed,
         embeddings_indexed,
         files_skipped: scan.skipped.len(),
+        files_read: scan.files_read,
+        metadata_reused: scan.metadata_reused,
         index_path: db_path,
     })
 }
@@ -225,9 +291,7 @@ pub fn pack_repo_with_options(root: &Path, options: PackOptions) -> Result<PackS
 pub fn read_stats(root: &Path) -> Result<IndexStats> {
     let conn = ensure_index(root)?;
     let path = index_path(root);
-    let manifest = fs::read_to_string(root.join(INDEX_DIR).join(MANIFEST_FILE))
-        .ok()
-        .and_then(|text| serde_json::from_str(&text).ok());
+    let manifest = read_manifest(root);
     Ok(IndexStats {
         manifest,
         file_count: count(&conn, "files")?,
@@ -237,6 +301,95 @@ pub fn read_stats(root: &Path) -> Result<IndexStats> {
         embedding_count: count(&conn, "chunk_embeddings")?,
         skipped_count: count(&conn, "skipped_files")?,
         index_path: path,
+    })
+}
+
+pub fn read_manifest(root: &Path) -> Option<Manifest> {
+    fs::read_to_string(root.join(INDEX_DIR).join(MANIFEST_FILE))
+        .ok()
+        .and_then(|text| serde_json::from_str(&text).ok())
+}
+
+pub fn database_schema_version(root: &Path) -> Result<Option<i64>> {
+    let path = index_path(root);
+    if !path.exists() {
+        return Ok(None);
+    }
+    let conn = Connection::open(&path)
+        .with_context(|| format!("SQLite index unreadable: {}", path.display()))?;
+    schema_version(&conn)
+}
+
+pub fn fts_available(conn: &Connection) -> Result<bool> {
+    table_exists(conn, "chunks_fts")
+}
+
+pub fn language_breakdown(conn: &Connection) -> Result<Vec<LanguageCount>> {
+    let mut stmt = conn.prepare(
+        "SELECT language, COUNT(*)
+         FROM files
+         GROUP BY language
+         ORDER BY COUNT(*) DESC, language",
+    )?;
+    let rows = stmt.query_map([], |row| {
+        Ok(LanguageCount {
+            language: row.get(0)?,
+            files: row.get(1)?,
+        })
+    })?;
+    rows.collect::<rusqlite::Result<Vec<_>>>()
+        .map_err(Into::into)
+}
+
+pub fn inspect_freshness(root: &Path) -> Result<IndexFreshness> {
+    let root = root.canonicalize()?;
+    let conn = ensure_index(&root)?;
+    let existing = existing_files(&conn)?;
+    let cache = existing
+        .iter()
+        .map(|(path, file)| {
+            (
+                path.clone(),
+                scanner::CachedFileMetadata {
+                    language: file.language.clone(),
+                    kind: file.kind.clone(),
+                    size_bytes: file.size_bytes,
+                    hash: file.hash.clone(),
+                    mtime_ns: file.mtime_ns,
+                },
+            )
+        })
+        .collect();
+    let config = config::load(&root)?;
+    let scan = scanner::scan_repo_with_cache(&root, &config, &cache)?;
+    let scanned: HashMap<&str, &scanner::ScannedFile> = scan
+        .files
+        .iter()
+        .map(|file| (file.rel_path.as_str(), file))
+        .collect();
+    let changed_files = scan
+        .files
+        .iter()
+        .filter(|file| {
+            existing
+                .get(&file.rel_path)
+                .is_none_or(|cached| cached.hash != file.hash)
+        })
+        .count();
+    let removed_files = existing
+        .keys()
+        .filter(|path| !scanned.contains_key(path.as_str()))
+        .count();
+    let config_changed = read_manifest(&root).is_none_or(|manifest| {
+        config::config_hash(&config).ok().as_ref() != Some(&manifest.config_hash)
+    });
+
+    Ok(IndexFreshness {
+        changed_files,
+        removed_files,
+        config_changed,
+        files_read: scan.files_read,
+        metadata_reused: scan.metadata_reused,
     })
 }
 
@@ -416,21 +569,37 @@ pub fn framework_signals(conn: &Connection) -> Result<Vec<String>> {
 #[derive(Debug)]
 struct ExistingFile {
     id: i64,
+    language: String,
+    kind: String,
+    size_bytes: u64,
     hash: String,
+    mtime_ns: i64,
 }
 
 fn existing_files(conn: &Connection) -> Result<HashMap<String, ExistingFile>> {
-    let mut stmt = conn.prepare("SELECT id, path, hash FROM files")?;
+    let mut stmt =
+        conn.prepare("SELECT id, path, language, kind, size_bytes, hash, mtime_ns FROM files")?;
     let rows = stmt.query_map([], |row| {
         Ok((
             row.get::<_, String>(1)?,
             ExistingFile {
                 id: row.get(0)?,
-                hash: row.get(2)?,
+                language: row.get(2)?,
+                kind: row.get(3)?,
+                size_bytes: row.get::<_, i64>(4)? as u64,
+                hash: row.get(5)?,
+                mtime_ns: row.get(6)?,
             },
         ))
     })?;
     rows.collect::<rusqlite::Result<HashMap<_, _>>>()
+        .map_err(Into::into)
+}
+
+fn existing_skipped_files(conn: &Connection) -> Result<HashSet<(String, String)>> {
+    let mut stmt = conn.prepare("SELECT path, reason FROM skipped_files")?;
+    let rows = stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?;
+    rows.collect::<rusqlite::Result<HashSet<_>>>()
         .map_err(Into::into)
 }
 
@@ -440,7 +609,7 @@ fn insert_scanned_file(
     indexed_at: i64,
 ) -> Result<usize> {
     tx.execute(
-        "INSERT INTO files (path, language, kind, size_bytes, hash, mtime, indexed_at)
+        "INSERT INTO files (path, language, kind, size_bytes, hash, mtime_ns, indexed_at)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
         params![
             file.rel_path,
@@ -448,12 +617,16 @@ fn insert_scanned_file(
             file.kind,
             file.size_bytes as i64,
             file.hash,
-            file.mtime,
+            file.mtime_ns,
             indexed_at
         ],
     )?;
     let file_id = tx.last_insert_rowid();
-    let chunked = chunk::chunk_file(&file.rel_path, &file.language, &file.text);
+    let text = file
+        .text
+        .as_deref()
+        .context("changed file content missing during indexing")?;
+    let chunked = chunk::chunk_file(&file.rel_path, &file.language, text);
     let chunk_count = chunked.chunks.len();
 
     for chunk in chunked.chunks {
@@ -462,11 +635,23 @@ fn insert_scanned_file(
              VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             params![
                 file_id,
-                chunk.kind,
-                chunk.name,
+                &chunk.kind,
+                &chunk.name,
                 chunk.start_line as i64,
                 chunk.end_line as i64,
-                chunk.text
+                &chunk.text
+            ],
+        )?;
+        let chunk_id = tx.last_insert_rowid();
+        tx.execute(
+            "INSERT INTO chunks_fts (rowid, path, kind, name, text)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![
+                chunk_id,
+                &file.rel_path,
+                &chunk.kind,
+                chunk.name.as_deref().unwrap_or(""),
+                &chunk.text
             ],
         )?;
     }
@@ -514,6 +699,10 @@ fn insert_scanned_file(
 
 fn delete_file(tx: &Transaction<'_>, file_id: i64, path: &str) -> Result<()> {
     tx.execute(
+        "DELETE FROM chunks_fts WHERE rowid IN (SELECT id FROM chunks WHERE file_id = ?1)",
+        params![file_id],
+    )?;
+    tx.execute(
         "DELETE FROM imports WHERE from_file_id = ?1",
         params![file_id],
     )?;
@@ -532,31 +721,31 @@ fn delete_file(tx: &Transaction<'_>, file_id: i64, path: &str) -> Result<()> {
     Ok(())
 }
 
-fn rebuild_fts(conn: &Connection) -> Result<()> {
-    conn.execute_batch(
-        "
-        DROP TABLE IF EXISTS chunks_fts;
-        CREATE VIRTUAL TABLE chunks_fts USING fts5(
-          path,
-          kind,
-          name,
-          text,
-          tokenize='unicode61'
-        );
-        INSERT INTO chunks_fts (rowid, path, kind, name, text)
-        SELECT c.id, f.path, c.kind, COALESCE(c.name, ''), c.text
-        FROM chunks c
-        JOIN files f ON c.file_id = f.id;
-        ",
-    )?;
-    Ok(())
-}
-
 fn ensure_schema(conn: &Connection) -> Result<()> {
-    if schema_version(conn)? != Some(SCHEMA_VERSION) {
+    if schema_version(conn)? != Some(SCHEMA_VERSION) || !schema_is_complete(conn)? {
         recreate_schema(conn)?;
     }
     Ok(())
+}
+
+fn schema_is_complete(conn: &Connection) -> Result<bool> {
+    for table in [
+        "meta",
+        "files",
+        "chunks",
+        "chunk_embeddings",
+        "symbols",
+        "imports",
+        "symbol_edges",
+        "commands",
+        "skipped_files",
+        "chunks_fts",
+    ] {
+        if !table_exists(conn, table)? {
+            return Ok(false);
+        }
+    }
+    Ok(true)
 }
 
 fn schema_version(conn: &Connection) -> Result<Option<i64>> {
@@ -614,7 +803,7 @@ fn recreate_schema(conn: &Connection) -> Result<()> {
           kind TEXT NOT NULL,
           size_bytes INTEGER NOT NULL,
           hash TEXT NOT NULL,
-          mtime INTEGER NOT NULL,
+          mtime_ns INTEGER NOT NULL,
           indexed_at INTEGER NOT NULL
         );
 

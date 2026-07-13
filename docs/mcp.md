@@ -2,10 +2,9 @@
 
 ScoutPack includes a read-only MCP server for agent clients that can call tools over stdio or local Streamable HTTP/SSE.
 
-The server does not index, edit files, run project commands, make outbound network calls, or write to the repo. Build or refresh the local index first:
+The server never edits project files, runs project commands, or makes outbound network calls. Index-backed tools automatically build or incrementally refresh local data under `.scoutpack/` before responding:
 
 ```bash
-scoutpack pack .
 scoutpack mcp .
 ```
 
@@ -103,8 +102,8 @@ Security notes:
 
 ## Notes
 
-- Run `scoutpack pack .` again after meaningful repo changes.
-- MCP tools require an existing `.scoutpack/pack.sqlite`.
+- Index-backed tools detect and refresh changed files automatically; no separate `pack` step is required.
+- Refreshes only write ScoutPack-owned files under `.scoutpack/` and never modify project source.
 - Tool responses include structured JSON plus text content for broad client compatibility.
 - `template` supports built-in templates such as `bugfix`, `refactor`, `review`, `docs`, and `test`.
 - `recent_changes` uses local git metadata only and returns file summaries with line counts, not full diff bodies.

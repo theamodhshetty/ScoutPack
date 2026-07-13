@@ -59,10 +59,10 @@ ScoutPack is most useful when you need reproducible, inspectable context across 
 cargo install --git https://github.com/theamodhshetty/ScoutPack.git
 
 cd your-project
-scoutpack init
-scoutpack pack .
 scoutpack context "fix login redirect loop" --budget 2500
 ```
+
+`context`, `search`, templates, and MCP tools build the local index on first use and refresh changed files automatically. `scoutpack init` remains optional when you want explicit configuration and ignore files.
 
 Output is local, compact, and agent-ready:
 
@@ -165,10 +165,9 @@ More detail: [docs/installation.md](docs/installation.md).
 Inside any repo:
 
 ```bash
-scoutpack init
-scoutpack pack .
 scoutpack search "auth middleware" --limit 5
 scoutpack context "fix login redirect loop" --budget 2500
+scoutpack doctor
 scoutpack stats
 ```
 
@@ -317,6 +316,8 @@ scoutpack pack .
 
 Scans and indexes a repo. Re-running `pack` reuses unchanged files.
 
+Unchanged files are identified from size and nanosecond modification time, so repeated packs avoid reading and hashing their contents. Changed files update only their own SQLite and FTS rows. Query commands do this refresh automatically; pass `--no-refresh` only when you intentionally need a frozen index.
+
 ```bash
 cargo install --git https://github.com/theamodhshetty/ScoutPack.git --features semantic
 scoutpack pack . --embed
@@ -325,6 +326,8 @@ scoutpack context "fix login flow" --semantic --budget 2500
 ```
 
 Optional local semantic search. This is not enabled in default installs. First use may download the local `BAAI/bge-small-en-v1.5` model after confirmation; ScoutPack still stores embeddings only in local SQLite and does not call model APIs.
+
+Automatic refresh updates deterministic FTS data only. Run `scoutpack pack . --embed` again when changed files also need semantic embeddings; ScoutPack never starts model work or downloads from an ordinary query refresh.
 
 ```bash
 scoutpack watch .
@@ -337,6 +340,7 @@ scoutpack search "auth middleware" --limit 5
 ```
 
 Searches the local index and returns ranked files/symbols with reasons.
+Builds the index on first use and refreshes changed files before querying.
 
 ```bash
 scoutpack search "auth middleware" --limit 5 --json
@@ -349,6 +353,7 @@ scoutpack context "fix login redirect loop" --budget 2500
 ```
 
 Builds a markdown packet for an AI coding task.
+Builds the index on first use and refreshes changed files before rendering.
 
 ```bash
 scoutpack context "fix login redirect loop" --expand-calls 2 --budget 2500
@@ -383,10 +388,19 @@ scoutpack context "fix login redirect loop" --format xml
 Returns XML-wrapped context for prompt templates. Supported formats: `markdown`, `json`, `xml`.
 
 ```bash
+scoutpack doctor
+scoutpack doctor --json
+scoutpack doctor --fix
+```
+
+Checks index readability, schema and FTS health, filesystem freshness, configuration, language coverage, framework signals, and Git state. `--fix` rebuilds or incrementally refreshes only ScoutPack's local index.
+
+```bash
 scoutpack stats
 ```
 
 Shows local index counts and manifest details.
+Builds or refreshes the index first; use `--no-refresh` for a frozen snapshot.
 
 ```bash
 scoutpack stats --json
@@ -398,7 +412,7 @@ Returns index stats and manifest data as JSON.
 scoutpack mcp .
 ```
 
-Starts a read-only stdio MCP server over the existing local index. Tools include `search`, `context`, `template`, `file_summary`, `symbol`, `commands`, `recent_changes`, and `stats`.
+Starts a read-only stdio MCP server. Index-backed tools build or incrementally refresh the local index before responding. Tools include `search`, `context`, `template`, `file_summary`, `symbol`, `commands`, `recent_changes`, and `stats`.
 
 ```bash
 scoutpack mcp . --http --port 7777
@@ -429,7 +443,7 @@ Generates shell completions for `bash`, `zsh`, `fish`, `powershell`, or `elvish`
 | Optional semantic search | local fastembed embeddings behind `--features semantic`; never enabled by default |
 | Context | markdown packets with budget-aware snippets |
 | Templates | built-in and custom Markdown prompt templates |
-| MCP | read-only stdio server for agent clients |
+| MCP | read-only stdio and HTTP/SSE server with automatic local index refresh |
 | Distribution | Cargo install plus generated shell completions |
 | Privacy | local-only index, sensitive file skips |
 

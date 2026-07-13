@@ -38,6 +38,12 @@ pub fn current_branch(root: &Path) -> Option<String> {
     }
 }
 
+pub fn head_commit(root: &Path) -> Option<String> {
+    let repo = Repository::discover(root).ok()?;
+    let head = repo.head().ok()?;
+    head.target().map(|oid| oid.to_string())
+}
+
 pub fn recent_changed_files(root: &Path) -> Vec<String> {
     let Ok(repo) = Repository::discover(root) else {
         return Vec::new();
@@ -55,6 +61,7 @@ pub fn recent_changed_files(root: &Path) -> Vec<String> {
     statuses
         .iter()
         .filter_map(|entry| entry.path().map(ToOwned::to_owned))
+        .filter(|path| path != ".scoutpack" && !path.starts_with(".scoutpack/"))
         .map(|path| relativize_to_root(&repo, workdir.as_deref(), root, &path))
         .collect()
 }
