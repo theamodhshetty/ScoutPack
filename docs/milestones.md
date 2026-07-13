@@ -126,6 +126,9 @@ scoutpack context "review my PR" --branch --expand-calls 1 --budget 3000
 - Prompt template library with built-in and custom Markdown templates
 - HTTP/SSE MCP mode for clients that do not use stdio
 - Basic symbol call graph with `context --expand-calls`
+- Metadata-aware incremental indexing that avoids reading unchanged files and updates FTS rows per changed file
+- Automatic first-use and stale-index refresh for CLI queries and MCP tools
+- `scoutpack doctor` health/freshness diagnostics with JSON and repair modes
 
 ## Next
 
@@ -170,7 +173,7 @@ Goal: reduce install friction.
 - add crates.io publish checklist final pass
 - add Homebrew tap instructions
 - decide whether `npx scoutpack` wrapper is worth maintenance
-- add `scoutpack doctor`
+- validate `scoutpack doctor` across release binaries
 
 Acceptance:
 

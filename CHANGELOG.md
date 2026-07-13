@@ -6,6 +6,8 @@ All notable ScoutPack changes are tracked here.
 
 ### Added
 
+- `scoutpack doctor` health and freshness diagnostics with text, JSON, and `--fix` modes.
+- Automatic first-use and stale-index refresh for `search`, `context`, `template`, and index-backed MCP tools, with `--no-refresh` for frozen CLI queries.
 - Pinned real-repo retrieval benchmarks with Top-1/3/5 hits and expected-file coverage.
 - Benchmark methodology docs and `scripts/bench-one-repo.sh` for local repo measurement.
 - Positioning doc and launch-focused roadmap/milestone reset around ScoutPack as a context preflight layer.
@@ -34,6 +36,8 @@ All notable ScoutPack changes are tracked here.
 
 ### Changed
 
+- Incremental indexing now avoids reading and hashing metadata-unchanged files and updates only affected FTS rows instead of rebuilding the entire FTS table.
+- Benchmark scripts now isolate retrieval/render latency with `--no-refresh` and parse chunk counts independently from embedding counts.
 - Benchmark reports now separate packet compression from retrieval quality and include host/toolchain metadata.
 - Source ranking boost now applies consistently to Python, Rust, Go, and Solidity, not only JavaScript/TypeScript.
 - Task query normalization removes generic edit verbs and maps common coding nouns such as `registration` to symbol forms such as `register`.

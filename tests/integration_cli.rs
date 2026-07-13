@@ -99,6 +99,10 @@ fn init_pack_search_context_stats_work() {
     );
     assert!(second_pack_out.contains("reused "), "{second_pack_out}");
     assert!(
+        second_pack_out.contains("Read 0 files"),
+        "{second_pack_out}"
+    );
+    assert!(
         second_pack_out.contains("added 0 chunks"),
         "{second_pack_out}"
     );
@@ -383,9 +387,12 @@ fn init_pack_search_context_stats_work() {
     assert!(completions_out.contains("completions"));
     assert!(completions_out.contains("watch"));
     assert!(completions_out.contains("template"));
+    assert!(completions_out.contains("doctor"));
+    assert!(completions_out.contains("--no-refresh"));
     assert!(completions_out.contains("semantic"));
     assert!(completions_out.contains("--http"));
 
+    fs::remove_dir_all(temp.path().join(".scoutpack")).unwrap();
     let mut mcp = Command::new(bin())
         .args(["mcp", "."])
         .current_dir(temp.path())
@@ -466,6 +473,122 @@ fn init_pack_search_context_stats_work() {
         .as_str()
         .unwrap()
         .contains("# Bugfix Prompt"));
+}
+
+#[test]
+fn queries_auto_refresh_and_doctor_repairs_stale_indexes() {
+    let temp = tempfile::tempdir().unwrap();
+    copy_dir(Path::new("tests/fixtures/nextjs-basic"), temp.path());
+
+    let context = Command::new(bin())
+        .args(["context", "fix login redirect loop", "--budget", "1800"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        context.status.success(),
+        "{}",
+        String::from_utf8_lossy(&context.stderr)
+    );
+    assert!(temp.path().join(".scoutpack/pack.sqlite").exists());
+
+    let doctor = Command::new(bin())
+        .args(["doctor", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        doctor.status.success(),
+        "{}",
+        String::from_utf8_lossy(&doctor.stderr)
+    );
+    let report: serde_json::Value = serde_json::from_slice(&doctor.stdout).unwrap();
+    assert_eq!(report["status"], "healthy");
+    assert_eq!(report["freshness"]["files_read"], 0);
+    assert!(report["freshness"]["metadata_reused"].as_u64().unwrap() > 0);
+
+    fs::write(
+        temp.path().join("src/lib/new-session.ts"),
+        "export function pendingSessionRefresh() { return 'fresh'; }\n",
+    )
+    .unwrap();
+
+    let stale = Command::new(bin())
+        .args(["doctor", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    let stale_report: serde_json::Value = serde_json::from_slice(&stale.stdout).unwrap();
+    assert_eq!(stale_report["status"], "stale");
+    assert_eq!(stale_report["freshness"]["changed_files"], 1);
+
+    let stale_search = Command::new(bin())
+        .args(["search", "pendingSessionRefresh", "--no-refresh"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(stale_search.status.success());
+    assert!(String::from_utf8_lossy(&stale_search.stdout).contains("No results from index"));
+
+    let repaired = Command::new(bin())
+        .args(["doctor", "--fix", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        repaired.status.success(),
+        "{}",
+        String::from_utf8_lossy(&repaired.stderr)
+    );
+    let repaired_report: serde_json::Value = serde_json::from_slice(&repaired.stdout).unwrap();
+    assert_eq!(repaired_report["status"], "healthy");
+    assert_eq!(repaired_report["refresh"]["files_indexed"], 1);
+
+    let repaired_search = Command::new(bin())
+        .args(["search", "pendingSessionRefresh", "--no-refresh"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    let repaired_out = String::from_utf8_lossy(&repaired_search.stdout);
+    assert!(
+        repaired_out.contains("src/lib/new-session.ts"),
+        "{repaired_out}"
+    );
+
+    fs::remove_file(temp.path().join("src/lib/new-session.ts")).unwrap();
+    let auto_refreshed = Command::new(bin())
+        .args(["search", "pendingSessionRefresh"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(auto_refreshed.status.success());
+    assert!(String::from_utf8_lossy(&auto_refreshed.stdout).contains("No results from index"));
+
+    let conn = rusqlite::Connection::open(temp.path().join(".scoutpack/pack.sqlite")).unwrap();
+    conn.execute("DROP TABLE chunks_fts", []).unwrap();
+    drop(conn);
+    let broken_fts = Command::new(bin())
+        .args(["doctor", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    let broken_report: serde_json::Value = serde_json::from_slice(&broken_fts.stdout).unwrap();
+    assert_eq!(broken_report["status"], "stale");
+    assert_eq!(broken_report["fts_ready"], false);
+
+    let rebuilt = Command::new(bin())
+        .args(["doctor", "--fix", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        rebuilt.status.success(),
+        "{}",
+        String::from_utf8_lossy(&rebuilt.stderr)
+    );
+    let rebuilt_report: serde_json::Value = serde_json::from_slice(&rebuilt.stdout).unwrap();
+    assert_eq!(rebuilt_report["status"], "healthy");
+    assert_eq!(rebuilt_report["fts_ready"], true);
 }
 
 #[test]
@@ -645,7 +768,7 @@ fn watch_reindexes_after_file_change() {
         .spawn()
         .unwrap();
 
-    let index_path = temp.path().join(".scoutpack/pack.sqlite");
+    let index_path = temp.path().join(".scoutpack/manifest.json");
     let start = Instant::now();
     while !index_path.exists() && start.elapsed() < Duration::from_secs(5) {
         thread::sleep(Duration::from_millis(50));
@@ -662,7 +785,7 @@ fn watch_reindexes_after_file_change() {
     let mut found = false;
     while start.elapsed() < Duration::from_secs(5) {
         let search = Command::new(bin())
-            .args(["search", "watchedChange", "--limit", "5"])
+            .args(["search", "watchedChange", "--limit", "5", "--no-refresh"])
             .current_dir(temp.path())
             .output()
             .unwrap();

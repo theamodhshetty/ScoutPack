@@ -3,6 +3,7 @@ use anyhow::{Context, Result};
 use ignore::WalkBuilder;
 use sha2::{Digest, Sha256};
 use std::{
+    collections::HashMap,
     fs,
     path::{Component, Path},
     time::UNIX_EPOCH,
@@ -30,8 +31,17 @@ pub struct ScannedFile {
     pub kind: String,
     pub size_bytes: u64,
     pub hash: String,
-    pub mtime: i64,
-    pub text: String,
+    pub mtime_ns: i64,
+    pub text: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct CachedFileMetadata {
+    pub language: String,
+    pub kind: String,
+    pub size_bytes: u64,
+    pub hash: String,
+    pub mtime_ns: i64,
 }
 
 #[derive(Debug, Clone)]
@@ -44,9 +54,20 @@ pub struct SkippedFile {
 pub struct ScanResult {
     pub files: Vec<ScannedFile>,
     pub skipped: Vec<SkippedFile>,
+    pub files_read: usize,
+    pub metadata_reused: usize,
 }
 
+#[cfg(test)]
 pub fn scan_repo(root: &Path, config: &ScoutpackConfig) -> Result<ScanResult> {
+    scan_repo_with_cache(root, config, &HashMap::new())
+}
+
+pub fn scan_repo_with_cache(
+    root: &Path,
+    config: &ScoutpackConfig,
+    cache: &HashMap<String, CachedFileMetadata>,
+) -> Result<ScanResult> {
     if !root.exists() {
         anyhow::bail!("Path does not exist: {}", root.display());
     }
@@ -129,6 +150,32 @@ pub fn scan_repo(root: &Path, config: &ScoutpackConfig) -> Result<ScanResult> {
             continue;
         }
 
+        let mtime_ns = metadata
+            .modified()
+            .ok()
+            .and_then(|mtime| mtime.duration_since(UNIX_EPOCH).ok())
+            .map(|duration| duration.as_nanos().min(i64::MAX as u128) as i64)
+            .unwrap_or_default();
+        if let Some(cached) = cache.get(&rel_path) {
+            if cached.language == language
+                && cached.kind == kind
+                && cached.size_bytes == metadata.len()
+                && cached.mtime_ns == mtime_ns
+            {
+                result.files.push(ScannedFile {
+                    rel_path,
+                    language,
+                    kind,
+                    size_bytes: metadata.len(),
+                    hash: cached.hash.clone(),
+                    mtime_ns,
+                    text: None,
+                });
+                result.metadata_reused += 1;
+                continue;
+            }
+        }
+
         let bytes = match fs::read(path) {
             Ok(bytes) => bytes,
             Err(err) => {
@@ -139,6 +186,7 @@ pub fn scan_repo(root: &Path, config: &ScoutpackConfig) -> Result<ScanResult> {
                 continue;
             }
         };
+        result.files_read += 1;
         if is_binary(&bytes) {
             result.skipped.push(SkippedFile {
                 path: rel_path,
@@ -157,21 +205,14 @@ pub fn scan_repo(root: &Path, config: &ScoutpackConfig) -> Result<ScanResult> {
             }
         };
         let hash = hash_bytes(&bytes);
-        let mtime = metadata
-            .modified()
-            .ok()
-            .and_then(|mtime| mtime.duration_since(UNIX_EPOCH).ok())
-            .map(|duration| duration.as_secs() as i64)
-            .unwrap_or_default();
-
         result.files.push(ScannedFile {
             rel_path,
             language,
             kind,
             size_bytes: metadata.len(),
             hash,
-            mtime,
-            text,
+            mtime_ns,
+            text: Some(text),
         });
     }
 
@@ -367,6 +408,42 @@ mod tests {
     use std::io::Write;
 
     #[test]
+    fn unchanged_files_reuse_metadata_without_reading_contents() {
+        let temp = tempfile::tempdir().unwrap();
+        fs::write(
+            temp.path().join("session.ts"),
+            "export function getSession() { return null; }",
+        )
+        .unwrap();
+        let config = ScoutpackConfig::default();
+        let initial = scan_repo(temp.path(), &config).unwrap();
+        assert_eq!(initial.files_read, 1);
+        let cache = initial
+            .files
+            .iter()
+            .map(|file| {
+                (
+                    file.rel_path.clone(),
+                    CachedFileMetadata {
+                        language: file.language.clone(),
+                        kind: file.kind.clone(),
+                        size_bytes: file.size_bytes,
+                        hash: file.hash.clone(),
+                        mtime_ns: file.mtime_ns,
+                    },
+                )
+            })
+            .collect();
+
+        let repeated = scan_repo_with_cache(temp.path(), &config, &cache).unwrap();
+
+        assert_eq!(repeated.files_read, 0);
+        assert_eq!(repeated.metadata_reused, 1);
+        assert!(repeated.files[0].text.is_none());
+        assert_eq!(repeated.files[0].hash, initial.files[0].hash);
+    }
+
+    #[test]
     fn sensitive_env_is_skipped() {
         let temp = tempfile::tempdir().unwrap();
         let mut file = fs::File::create(temp.path().join(".env")).unwrap();
@@ -433,8 +510,10 @@ mod tests {
         fs::write(temp.path().join("latin1.json"), [0xff, 0xfe, 0xfd]).unwrap();
         fs::write(temp.path().join("large.ts"), "x".repeat(2048)).unwrap();
 
-        let mut config = ScoutpackConfig::default();
-        config.max_file_size_kb = 1;
+        let config = ScoutpackConfig {
+            max_file_size_kb: 1,
+            ..ScoutpackConfig::default()
+        };
         let result = scan_repo(temp.path(), &config).unwrap();
 
         assert!(result.files.is_empty());

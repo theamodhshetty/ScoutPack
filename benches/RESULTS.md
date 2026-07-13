@@ -12,7 +12,7 @@ Toolchain: `rustc 1.95.0 (59807616e 2026-04-14)` / `Python 3.9.2`
 - Incremental re-pack runs `scoutpack pack .` again without file changes.
 - Packet and broad-baseline tokens use ScoutPack's approximation: `(chars + words) / 4 + 1`; this is not a model tokenizer.
 - Broad-baseline tokens count UTF-8 source/config/docs files under supported extensions while skipping generated and sensitive default folders.
-- Search latency runs 20 JSON searches per repo and reports p50/p95 wall-clock time.
+- Search latency runs 20 JSON searches with `--no-refresh` after the explicit pack and reports p50/p95 wall-clock time; incremental pack reports refresh cost separately.
 - Expected files are hand-authored inspection targets for each pinned task. Top-K is measured over unique ranked paths.
 
 ## Efficiency

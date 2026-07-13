@@ -7,12 +7,16 @@ use rmcp::{
 };
 use serde::Deserialize;
 use serde_json::{json, Value};
-use std::{path::PathBuf, sync::Arc};
+use std::{
+    path::PathBuf,
+    sync::{Arc, Mutex},
+};
 use tokio_util::sync::CancellationToken;
 
 #[derive(Debug, Clone)]
 pub struct ScoutpackMcp {
     root: PathBuf,
+    refresh_lock: Arc<Mutex<()>>,
     #[allow(dead_code)]
     tool_router: ToolRouter<Self>,
 }
@@ -21,8 +25,18 @@ impl ScoutpackMcp {
     pub fn new(root: PathBuf) -> Self {
         Self {
             root,
+            refresh_lock: Arc::new(Mutex::new(())),
             tool_router: Self::tool_router(),
         }
+    }
+
+    fn refresh(&self) -> Result<()> {
+        let _guard = self
+            .refresh_lock
+            .lock()
+            .map_err(|_| anyhow::anyhow!("Index refresh lock is unavailable"))?;
+        index::pack_repo(&self.root)?;
+        Ok(())
     }
 }
 
@@ -102,6 +116,7 @@ impl ScoutpackMcp {
             show_snippets,
         }): Parameters<SearchRequest>,
     ) -> Result<CallToolResult, McpError> {
+        self.refresh().map_err(to_mcp_error)?;
         let limit = limit.unwrap_or(5).min(50);
         let results =
             search::search_repo(&self.root, &query, limit, show_snippets.unwrap_or(false))
@@ -125,6 +140,7 @@ impl ScoutpackMcp {
             expand_calls,
         }): Parameters<ContextRequest>,
     ) -> Result<CallToolResult, McpError> {
+        self.refresh().map_err(to_mcp_error)?;
         let expand_calls = expand_calls.unwrap_or(0);
         let packet = if expand_calls == 0 {
             context::build_context_packet(&self.root, &task, budget)
@@ -163,6 +179,7 @@ impl ScoutpackMcp {
             branch,
         }): Parameters<TemplateRequest>,
     ) -> Result<CallToolResult, McpError> {
+        self.refresh().map_err(to_mcp_error)?;
         let git_mode =
             optional_mcp_git_mode(since, diff, branch.unwrap_or(false)).map_err(to_mcp_error)?;
         let prompt = templates::render_prompt(
@@ -185,6 +202,7 @@ impl ScoutpackMcp {
         &self,
         Parameters(FileSummaryRequest { path }): Parameters<FileSummaryRequest>,
     ) -> Result<CallToolResult, McpError> {
+        self.refresh().map_err(to_mcp_error)?;
         let conn = index::ensure_index(&self.root).map_err(to_mcp_error)?;
         let summary = index::read_file_summary(&conn, &path).map_err(to_mcp_error)?;
         Ok(structured(json!({
@@ -202,6 +220,7 @@ impl ScoutpackMcp {
         &self,
         Parameters(SymbolRequest { query, limit }): Parameters<SymbolRequest>,
     ) -> Result<CallToolResult, McpError> {
+        self.refresh().map_err(to_mcp_error)?;
         let limit = limit.unwrap_or(10).min(50);
         let conn = index::ensure_index(&self.root).map_err(to_mcp_error)?;
         let matches = index::find_symbols(&conn, &query, limit).map_err(to_mcp_error)?;
@@ -217,6 +236,7 @@ impl ScoutpackMcp {
         description = "Return package commands discovered during indexing without executing them."
     )]
     fn commands(&self) -> Result<CallToolResult, McpError> {
+        self.refresh().map_err(to_mcp_error)?;
         let conn = index::ensure_index(&self.root).map_err(to_mcp_error)?;
         let commands = index::read_indexed_commands(&conn).map_err(to_mcp_error)?;
         Ok(structured(json!({
@@ -248,6 +268,7 @@ impl ScoutpackMcp {
         description = "Return index counts and manifest metadata for the configured repo."
     )]
     fn stats(&self) -> Result<CallToolResult, McpError> {
+        self.refresh().map_err(to_mcp_error)?;
         let stats = index::read_stats(&self.root).map_err(to_mcp_error)?;
         Ok(structured(json!({
             "index_path": stats.index_path,
@@ -271,7 +292,7 @@ impl ServerHandler for ScoutpackMcp {
                 env!("CARGO_PKG_VERSION"),
             ))
             .with_instructions(
-                "ScoutPack is a read-only local repo context server. Run `scoutpack pack .` before using MCP tools.",
+                "ScoutPack is a read-only local repo context server. Index-backed tools automatically refresh changed files before responding.",
             )
     }
 }

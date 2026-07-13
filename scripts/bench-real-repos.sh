@@ -104,7 +104,7 @@ def parse_pack(output: str):
             values["indexed"] = int(words[idx + 1])
         if word == "reused" and idx + 1 < len(words):
             values["reused"] = int(words[idx + 1])
-        if word == "added" and idx + 1 < len(words):
+        if word == "added" and idx + 2 < len(words) and words[idx + 2] == "chunks":
             values["chunks"] = int(words[idx + 1])
         if word == "skipped" and idx + 1 < len(words):
             values["skipped"] = int(words[idx + 1])
@@ -138,7 +138,9 @@ for name, url, expected_commit, task, query, expected_raw in repo_specs:
     cold = parse_pack(cold_out)
     incremental_ms, incremental_out = timed([str(scoutpack), "pack", "."], repo)
     incremental = parse_pack(incremental_out)
-    context_ms, packet = timed([str(scoutpack), "context", task, "--budget", "2500"], repo)
+    context_ms, packet = timed(
+        [str(scoutpack), "context", task, "--budget", "2500", "--no-refresh"], repo
+    )
     packet_tokens = token_estimate(packet)
     naive = naive_tokens(repo)
 
@@ -146,7 +148,7 @@ for name, url, expected_commit, task, query, expected_raw in repo_specs:
     ranked_paths = []
     for _ in range(20):
         elapsed_ms, search_output = timed(
-            [str(scoutpack), "search", query, "--limit", "20", "--json"], repo
+            [str(scoutpack), "search", query, "--limit", "20", "--json", "--no-refresh"], repo
         )
         search_times.append(elapsed_ms)
         if not ranked_paths:

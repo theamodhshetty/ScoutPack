@@ -115,7 +115,7 @@ This is useful for scripts, wrappers, and clients that prefer direct JSON output
 
 ## MCP Clients
 
-For clients that support MCP, run ScoutPack as a read-only stdio server over an existing index:
+For clients that support MCP, run ScoutPack as a read-only stdio server. Index-backed tools build and refresh ScoutPack's local index automatically:
 
 ```bash
 scoutpack pack .

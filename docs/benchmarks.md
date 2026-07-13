@@ -59,7 +59,7 @@ It measures:
 - reduction ratio
 - search latency for your task text
 
-It does not execute project commands and does not make network calls.
+Search and packet latency use `--no-refresh` after the explicit pack step so they measure retrieval/rendering separately from incremental freshness scanning. The incremental pack metric measures refresh cost. The script does not execute project commands or make network calls.
 
 Add expected paths to validate retrieval quality:
 
