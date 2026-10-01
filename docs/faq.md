@@ -48,7 +48,7 @@ No. Benchmarks measure retrieval and compression; compact packets can omit neces
 
 ## Does MCP context support Git scope?
 
-Current MCP `context` schema supports task, budget, and call expansion, not CLI Git flags. Use CLI for committed review packets; `recent_changes` provides a summary separately. [MCP reference](mcp.md).
+Yes. MCP `context` accepts optional `since`, `diff`, or `branch` fields with the same committed-content semantics as CLI. Choose only one scope. Without a scope, context uses the current working tree. [MCP reference](mcp.md).
 
 ## Where should I start if something fails?
 

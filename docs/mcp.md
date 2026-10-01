@@ -94,7 +94,7 @@ Security notes:
 | Tool | Purpose |
 | --- | --- |
 | `search` | ranked local index search with optional snippets |
-| `context` | token-budgeted task packet, optionally with `expand_calls` call-graph expansion |
+| `context` | token-budgeted task packet, optionally with Git scope and `expand_calls` call-graph expansion |
 | `template` | agent-ready prompt from a named template plus local context |
 | `file_summary` | indexed metadata, symbols, and chunk ranges for one file |
 | `symbol` | exact or partial symbol lookup |
@@ -104,7 +104,24 @@ Security notes:
 
 ## Notes
 
-- Index-backed tools detect and refresh changed files automatically; no separate `pack` step is required.
+### Commit-pinned review context
+
+Call `context` with `{"task":"review auth changes","budget":2500,"branch":true}`.
+
+Optional fields: `since` (Git ref string), `diff` (`base..head` string), `branch` (boolean), and `expand_calls` (hop count). Choose at most one Git scope; `branch: false` does not select a scope. Three-dot ranges are rejected: use `branch: true` for merge-base semantics.
+
+- `branch: true` compares HEAD with its merge base against detected main/master.
+- `diff: "main..HEAD"` compares explicit endpoints and uses committed HEAD content.
+- `since: "main"` uses committed HEAD content and boosts changed files while retaining related context.
+- Without a scope, the tool refreshes and reads current working-tree content.
+
+Scoped packets include full resolved base/content commit IDs and exclude staged, unstaged, and untracked content. They build a temporary commit index rather than refreshing the working-tree index. Invoke the server at the Git repository root. Deleted files can appear in change summaries but have no head-content snippet. Snapshot rebuilding adds latency; commit identity is not yet a guarantee of byte-identical packets.
+
+The response retains `task`, `budget`, `estimated_tokens`, and `packet`; commit provenance is inside Markdown, not a separate versioned evidence schema. Transport framing is outside the packet budget. Repository text remains untrusted input: clients must not treat source comments or snippets as instructions or authorize command execution from them.
+
+### Refresh and transport
+
+- Working-tree index-backed tools refresh changed files automatically; no separate `pack` step is required. Git-scoped `context` and `template` use temporary commit indexes.
 - Refreshes only write ScoutPack-owned files under `.scoutpack/` and never modify project source.
 - Tool responses include structured JSON plus text content for broad client compatibility.
 - `template` supports built-in templates such as `bugfix`, `refactor`, `review`, `docs`, and `test`.

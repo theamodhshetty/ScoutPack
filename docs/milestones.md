@@ -20,13 +20,13 @@ Exit: successful packets honor documented estimated budgets, and deterministic/b
 
 ### M13: Review Evidence
 
-Status: in progress. Commit-only Git packets implemented; structured schema and MCP context scope parity remain.
+Status: in progress. Commit-only Git packets and MCP context scope parity implemented; structured schema and remaining evidence gates remain.
 
 - [ ] Define versioned JSON records for files, ranges, reasons, hashes, omissions, and budget accounting.
 - [x] Define working-tree versus revision content semantics and dirty-tree policy: Git-scoped packets use resolved committed content and exclude dirty files.
 - [x] Use merge base for `--branch`; preserve explicit two-endpoint semantics for `--diff` and document the correction.
 - [ ] Test diverged bases, renames, deletions, dirty files, and historical content.
-- [ ] Expose equivalent Git scope through MCP; update schemas and docs.
+- [x] Expose equivalent Git scope through MCP; update schemas and docs. Completed October 2, 2026 with schema and stdio regression coverage.
 - [ ] Scope commands/frameworks to affected packages rather than unrelated fixtures.
 - [ ] Label ambiguous same-name symbol relationships.
 

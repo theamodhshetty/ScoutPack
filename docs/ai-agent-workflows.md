@@ -119,7 +119,7 @@ For clients that support MCP, run ScoutPack as a read-only stdio server. Index-b
 scoutpack mcp .
 ```
 
-The MCP server exposes `search`, `context`, `template`, `file_summary`, `symbol`, `commands`, `recent_changes`, and `stats`. Use absolute project paths for clients. CLI Git flags are not exposed by MCP `context`; use CLI for committed packets. See [MCP server](mcp.md).
+The MCP server exposes `search`, `context`, `template`, `file_summary`, `symbol`, `commands`, `recent_changes`, and `stats`. Use absolute project paths for clients. For committed review packets, call `context` with `branch: true`, `diff: "main..HEAD"`, or `since: "main"` (only one). See [MCP server](mcp.md).
 
 ## AGENTS.md Hint
 

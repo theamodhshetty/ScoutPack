@@ -115,7 +115,7 @@ Available tools: `search`, `context`, `template`, `file_summary`, `symbol`, `com
 | GitHub Copilot / VS Code | [VS Code MCP config](docs/ai-agent-workflows.md#github-copilot-in-vs-code) |
 | Aider | [Choose files from search results](docs/ai-agent-workflows.md#aider) |
 
-Config formats differ by client. The MCP `context` tool does not currently expose the CLI's Git scope flags; use CLI for commit-pinned review packets. Local Streamable HTTP/SSE setup is documented in [MCP reference](docs/mcp.md).
+Config formats differ by client. For commit-pinned review, call MCP `context` with `{"task":"review auth changes","branch":true,"budget":2500}`. Use `diff` or `since` for explicit refs instead. Local Streamable HTTP/SSE setup and scope semantics are documented in [MCP reference](docs/mcp.md).
 
 ## Supported Languages
 
