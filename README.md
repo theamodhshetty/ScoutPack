@@ -1,74 +1,56 @@
-<p align="center">
-  <img src="assets/scoutpack-logo.svg" width="720" alt="ScoutPack logo">
-</p>
+# ScoutPack
 
 <p align="center">
-  <strong>Context preflight for AI coding agents.</strong>
+  <img src="assets/scoutpack-logo.svg" width="640" alt="ScoutPack: local code context for AI coding agents">
 </p>
 
-<p align="center">
-  Help Codex, Claude Code, Cursor, Aider, Copilot, and MCP clients start with the right files, not the whole repo.
-</p>
+**Local code search and focused context packets for AI coding agents.**
 
-<p align="center">
-  <a href="https://github.com/theamodhshetty/ScoutPack/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/theamodhshetty/ScoutPack/ci.yml?branch=main&label=CI"></a>
-  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-2563eb"></a>
-  <a href="Cargo.toml"><img alt="Rust" src="https://img.shields.io/badge/Rust-CLI-f97316"></a>
-  <a href="docs/mcp.md"><img alt="MCP" src="https://img.shields.io/badge/MCP-read--only-14b8a6"></a>
-  <img alt="Local first" src="https://img.shields.io/badge/local--first-no%20cloud-0f172a">
-</p>
+ScoutPack indexes your repository, finds relevant files and symbols, and prepares task-specific context under an estimated token budget. Use it for PR review, bug investigation, or a handoff to Codex, Claude Code, Cursor, Aider, and other tools that accept text or MCP.
 
-<p align="center">
-  <a href="#quick-start">Quick Start</a> ·
-  <a href="#efficiency-model">Efficiency</a> ·
-  <a href="#demo">Demo</a> ·
-  <a href="#mcp-server">MCP</a> ·
-  <a href="#agent-client-setup">Agents</a> ·
-  <a href="#commands">Commands</a> ·
-  <a href="docs/installation.md">Install</a> ·
-  <a href="docs/milestones.md">Roadmap</a>
-</p>
+[![CI](https://github.com/theamodhshetty/ScoutPack/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/theamodhshetty/ScoutPack/actions/workflows/ci.yml)
+[![MIT License](https://img.shields.io/badge/license-MIT-2563eb)](LICENSE)
+[![Rust CLI](https://img.shields.io/badge/Rust-CLI-f97316)](Cargo.toml)
+[![Read-only MCP](https://img.shields.io/badge/MCP-read--only-14b8a6)](docs/mcp.md)
 
----
+[Quick start](#quick-start) · [Choose a workflow](#choose-a-workflow) · [MCP setup](#mcp-code-search) · [Troubleshooting](docs/getting-started.md#troubleshooting) · [Documentation](docs/README.md)
 
-## Why ScoutPack
+## Quick Start
 
-AI coding agents are powerful, but they still burn time and tokens when they start with the wrong repo context.
-
-| Without ScoutPack | With ScoutPack |
-| --- | --- |
-| Agent scans broad folders. | Agent starts with ranked files and symbols. |
-| Repo conventions get missed. | Package scripts and framework signals are included. |
-| Secret files are risky. | Sensitive patterns are skipped by default. |
-| Context grows into noise. | Successful packets fit ScoutPack's estimated token budget. |
-| Debugging starts from guesses. | Risk hints point to source-backed inspection areas. |
-
-ScoutPack answers one practical question before edits start:
-
-```txt
-What should this AI agent read first for this task?
-```
-
-Think of ScoutPack as a local context preflight check: run it before asking an agent to edit code, review a PR, debug a failing flow, or audit a risky path.
-
-ScoutPack is most useful when you need reproducible, inspectable context across tools. Native agent search may be enough for small repos or one-off tasks. See [WHY.md](WHY.md) for where ScoutPack helps and where it does not.
-
-`--budget` bounds the complete Markdown packet using ScoutPack's heuristic estimator, not a provider tokenizer. JSON/XML envelopes and template framing are outside that budget. Requests too small to preserve task and source metadata fail with an actionable minimum; oversized sections are omitted explicitly.
-
-For committed PR review, run `scoutpack context "review my PR" --branch --budget 3000` from the repository root. Git-scoped packets read a temporary index of the resolved content commit and include full commit IDs; staged, unstaged, and untracked changes are excluded. `--branch` uses the merge base with main. See [Git-aware context](examples/git-aware-context.md) for scope and limitations.
-
-## One-Minute Flow
+Requires Rust/Cargo and Git. SQLite is bundled; no model account or API key is needed for the default install.
 
 ```bash
-cargo install --git https://github.com/theamodhshetty/ScoutPack.git
+cargo install --git https://github.com/theamodhshetty/ScoutPack.git --locked
+scoutpack --version
+```
 
-cd your-project
+In the project you want to inspect:
+
+```bash
 scoutpack context "fix login redirect loop" --budget 2500
 ```
 
-`context`, `search`, templates, and MCP tools build the local index on first use and refresh changed files automatically. `scoutpack init` remains optional when you want explicit configuration and ignore files.
+Paste the packet into your agent alongside the task. Review it before sharing private code with an external provider. Ordinary queries create and refresh the local index automatically; `init` and a manual `pack` are optional.
 
-Output is local, compact, and agent-ready:
+**Trying from a checkout?** Use `cargo install --path . --locked`. The published `v0.1.0` release has an older feature set. Binary installer, Homebrew, and Scoop scaffolding exist, but require published artifacts and checksums; Cargo source installation is the documented path today. [Installation and updates](docs/installation.md).
+
+## Choose A Workflow
+
+| Your task | Command | What to expect |
+| --- | --- | --- |
+| Find relevant code | `scoutpack search "auth middleware" --limit 5` | Ranked paths, symbols, and selection reasons |
+| Investigate a bug | `scoutpack context "fix login redirect loop" --budget 2500` | Working-tree context, snippets, commands, and inspection hints |
+| Review committed PR changes | `scoutpack context "review my PR" --branch --budget 3000` | Commit-only context from the merge base with main to HEAD |
+| Review a specific range | `scoutpack context "review auth changes" --diff main..HEAD --budget 3000` | Two-endpoint change scope with resolved content commit |
+| Prepare a complete prompt | `scoutpack template bugfix "signup returns 500" --budget 2500` | Task framing plus a context packet |
+| Keep local index current | `scoutpack watch .` | Debounced indexing during edits |
+| Diagnose index problems | `scoutpack doctor` | Health, freshness, and suggested repair |
+
+Run Git review commands from repository root. They exclude staged, unstaged, and untracked edits. Use ordinary `context` for work in progress. [Git review details](examples/git-aware-context.md).
+
+## What A Context Packet Contains
+
+Illustrative excerpt, not a performance result:
 
 ```md
 # ScoutPack Context
@@ -84,428 +66,107 @@ Relevant Files:
 Current Repo Signals:
 - Framework: Next.js, React, Vitest
 - test command: `vitest`
-- build command: `next build`
 
-Risk Hints:
-- [medium] redirect loop if post-login destination points back to login or auth guard
-  (source: `src/middleware/auth.ts:3-14`)
+Relevant Snippets:
+...
 ```
 
-No cloud. No API key. No telemetry. No auto-edits. No project command execution.
+Packets also include likely inspection areas, heuristic risk hints, and budget information. Git-scoped packets identify full base and content commit IDs. Snippet ranges refer to that commit, which may differ from files currently open in your editor.
 
-## Efficiency Model
+`--budget` bounds the **complete Markdown packet using ScoutPack's estimator**, not a provider tokenizer. JSON/XML envelopes and template instructions are outside the packet budget. Limited budgets omit content; requests below the minimum metadata size fail with an actionable error.
 
-<p align="center">
-  <img src="assets/scoutpack-efficiency.svg" width="760" alt="ScoutPack efficiency model">
-</p>
-
-ScoutPack keeps the first agent prompt small and targeted: if an agent would otherwise read broad files and chat history before finding the right area, ScoutPack lets you start from a focused packet such as `--budget 2500`. Reproducible results report compression beside Top-1/3/5 retrieval quality in [benches/RESULTS.md](benches/RESULTS.md), with methodology in [docs/benchmarks.md](docs/benchmarks.md).
-
-| Efficiency lever | How ScoutPack helps |
-| --- | --- |
-| Fewer wasted reads | ranked search points at likely edit files first |
-| Smaller first prompt | `context --budget` trims snippets to a fixed target |
-| Less manual setup | package scripts, framework signals, and risk hints are included |
-| Better dependency trail | `context --expand-calls` follows direct symbol calls |
-| Better handoff | Markdown, JSON, and MCP all expose the same local index |
-| Safer context | common secret files skipped before indexing |
-
-Run the same measurement on your own repo:
+For scripts:
 
 ```bash
-scripts/bench-one-repo.sh /path/to/repo "review my PR" /tmp/scoutpack-benchmark.md
-```
-
-Small packet alone is not success. Benchmark passes only when expected files rank near top.
-
-## What You Get
-
-| Feature | What it does |
-| --- | --- |
-| Local index | SQLite + FTS5 index in `.scoutpack/` |
-| Smart scan | Respects `.gitignore`, `.scoutpackignore`, binary limits, and sensitive skips |
-| Code structure | JS/TS, Python, Rust, Go, Solidity symbols, imports, and direct call edges |
-| Task context | Token-budgeted packet with relevant files, snippets, commands, and documented risk hints |
-| Prompt templates | Built-in bugfix, refactor, review, docs, and test prompts |
-| MCP server | Read-only `search`, `context`, `template`, `file_summary`, `symbol`, `commands`, `recent_changes`, `stats` tools |
-| Automation output | JSON mode for wrappers and scripts |
-
-## Search Terms
-
-People may look for this as AI coding agent context, context preflight, local codebase search for AI, offline repo indexing, context engineering for code, local-first RAG alternative, token-budgeted code context, repo map, MCP code search, or private repo context.
-
-## Install
-
-From a local checkout:
-
-```bash
-git clone https://github.com/theamodhshetty/ScoutPack.git
-cd ScoutPack
-cargo install --path .
-```
-
-From GitHub:
-
-```bash
-cargo install --git https://github.com/theamodhshetty/ScoutPack.git
-```
-
-From a release binary on macOS/Linux:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/theamodhshetty/ScoutPack/main/install.sh | sh
-```
-
-Requirements:
-
-- Rust stable
-- SQLite support is bundled through `rusqlite`
-- no Node install required for ScoutPack itself
-
-More detail: [docs/installation.md](docs/installation.md).
-
-## Quick Start
-
-Inside any repo:
-
-```bash
-scoutpack search "auth middleware" --limit 5
-scoutpack context "fix login redirect loop" --budget 2500
-scoutpack doctor
-scoutpack stats
-```
-
-ScoutPack writes local-only data:
-
-```txt
-.scoutpack/
-  pack.sqlite
-  manifest.json
-  repo-map.md
-```
-
-## Demo
-
-<p align="center">
-  <img src="assets/scoutpack-terminal-demo.svg" width="820" alt="ScoutPack terminal demo">
-</p>
-
-Branch-aware PR review:
-
-```bash
-scoutpack context "review login redirect PR" --branch --expand-calls 1 --budget 2200
-```
-
-Context packet:
-
-```md
-# ScoutPack Context
-
-Task:
-review login redirect PR
-
-Relevant Files:
-- `src/middleware/auth.ts`: function `requireAuth`
-- `src/lib/session.ts`: function `getSession`; call graph: `requireAuth` calls `getSession`
-
-Recent Changes:
-- Range: `main`..`HEAD`
-- Summary: 1 files changed, +4 -1
-
-Current Repo Signals:
-- Framework: Next.js, React, Vitest
-- test command: `vitest`
-- lint command: `eslint .`
-- build command: `next build`
-
-Likely Edit Areas:
-- `src/lib/session.ts:5-7`
-- `src/middleware/auth.ts:3-18`
-- auth/session boundary files
-- redirect and destination parameter handling
-
-Risk Hints:
-- [medium] redirect loop if post-login destination points back to login or auth guard (source: `src/middleware/auth.ts:3-18`)
-```
-
-Full walkthrough: [docs/demo.md](docs/demo.md).
-
-## MCP Server
-
-Use ScoutPack directly from MCP-aware agent clients:
-
-```json
-{
-  "mcpServers": {
-    "scoutpack": {
-      "command": "scoutpack",
-      "args": ["mcp", "."]
-    }
-  }
-}
-```
-
-Available tools:
-
-| Tool | Returns |
-| --- | --- |
-| `search` | ranked files, symbols, snippets, and reasons |
-| `context` | full task packet with estimated token count |
-| `template` | agent-ready prompt from a named template plus local context |
-| `file_summary` | indexed file metadata, symbols, and chunk ranges |
-| `symbol` | exact or partial symbol matches |
-| `commands` | discovered package scripts without running them |
-| `recent_changes` | local git diff summary for branch, diff, or since ranges |
-| `stats` | index counts and manifest details |
-
-HTTP/SSE clients can use the same tools at `http://127.0.0.1:7777/mcp`:
-
-```bash
-scoutpack mcp . --http --port 7777
-```
-
-Full setup: [docs/mcp.md](docs/mcp.md).
-
-## Agent Client Setup
-
-| Client | Fast path | Notes |
-| --- | --- | --- |
-| Codex | Run `scoutpack context "task" --budget 2500`, paste packet into task. | MCP users can configure ScoutPack as a local stdio MCP server. |
-| Claude Code | Add ScoutPack via `.mcp.json` or `claude mcp add`, then ask Claude to use `scoutpack.context`. | Best for repeated repo work. |
-| GitHub Copilot / VS Code | Add ScoutPack to `.vscode/mcp.json`, open Copilot Chat Agent mode, enable tools. | Uses VS Code MCP config format. |
-| Cursor | Add ScoutPack to Cursor MCP config or paste `context` output. | Same read-only tools over stdio or HTTP/SSE where supported. |
-| Aider | Use `search` output to choose files, then add them to Aider. | Good when you want explicit file control. |
-| Scripts/CI helpers | Use `search --json`, `context --json`, `stats --json`. | Stable machine-readable output. |
-
-Shared local stdio server:
-
-```json
-{
-  "mcpServers": {
-    "scoutpack": {
-      "command": "scoutpack",
-      "args": ["mcp", "."]
-    }
-  }
-}
-```
-
-VS Code / GitHub Copilot workspace config uses `servers`:
-
-```json
-{
-  "servers": {
-    "scoutpack": {
-      "type": "stdio",
-      "command": "scoutpack",
-      "args": ["mcp", "."]
-    }
-  }
-}
-```
-
-More workflows: [docs/ai-agent-workflows.md](docs/ai-agent-workflows.md).
-
-## Commands
-
-```bash
-scoutpack init
-```
-
-Creates `scoutpack.toml` and `.scoutpackignore`.
-
-```bash
-scoutpack pack .
-```
-
-Scans and indexes a repo. Re-running `pack` reuses unchanged files.
-
-Unchanged files are identified from size and nanosecond modification time, so repeated packs avoid reading and hashing their contents. Changed files update only their own SQLite and FTS rows. Query commands do this refresh automatically; pass `--no-refresh` only when you intentionally need a frozen index.
-
-```bash
-cargo install --git https://github.com/theamodhshetty/ScoutPack.git --features semantic
-scoutpack pack . --embed
-scoutpack search "login flow" --semantic
-scoutpack context "fix login flow" --semantic --budget 2500
-```
-
-Optional local semantic search. This is not enabled in default installs. First use may download the local `BAAI/bge-small-en-v1.5` model after confirmation; ScoutPack still stores embeddings only in local SQLite and does not call model APIs.
-
-Automatic refresh updates deterministic FTS data only. Run `scoutpack pack . --embed` again when changed files also need semantic embeddings; ScoutPack never starts model work or downloads from an ordinary query refresh.
-
-```bash
-scoutpack watch .
-```
-
-Keeps the local index fresh while you edit. Debounced re-index output goes to stderr.
-
-```bash
-scoutpack search "auth middleware" --limit 5
-```
-
-Searches the local index and returns ranked files/symbols with reasons.
-Builds the index on first use and refreshes changed files before querying.
-
-```bash
+scoutpack context "fix login redirect loop" --budget 2500 --format json
 scoutpack search "auth middleware" --limit 5 --json
 ```
 
-Returns machine-readable JSON for scripts and tools.
+Context JSON currently contains metadata and a Markdown `packet` string. It is not yet a versioned structured evidence schema. XML wrapping is also available with `--format xml`.
+
+## MCP Code Search
+
+ScoutPack provides a local, read-only Model Context Protocol server. Start with stdio:
 
 ```bash
-scoutpack context "fix login redirect loop" --budget 2500
+scoutpack mcp /absolute/path/to/your-project
 ```
 
-Builds a markdown packet for an AI coding task.
-Builds the index on first use and refreshes changed files before rendering.
+For clients using `mcpServers`, configure an explicit project path rather than relying on the client's working directory:
 
-```bash
-scoutpack context "fix login redirect loop" --expand-calls 2 --budget 2500
+```json
+{
+  "mcpServers": {
+    "scoutpack": {
+      "command": "scoutpack",
+      "args": ["mcp", "/absolute/path/to/your-project"]
+    }
+  }
+}
 ```
 
-Adds symbols called by matched symbols, useful when root-cause code lives behind a helper or service call.
+Available tools: `search`, `context`, `template`, `file_summary`, `symbol`, `commands`, `recent_changes`, and `stats`.
 
-```bash
-scoutpack template bugfix "fix login redirect loop" --budget 2500
-```
-
-Builds an agent-ready prompt from a template plus ScoutPack context. Built-ins: `bugfix`, `refactor`, `review`, `docs`, `test`.
-
-```bash
-scoutpack context "review my PR" --branch
-scoutpack context "review auth changes" --diff main..HEAD
-scoutpack context "continue indexing work" --since HEAD~5
-```
-
-Adds a Recent Changes section and prioritizes changed files from the local git range.
-
-```bash
-scoutpack context "fix login redirect loop" --budget 2500 --json
-```
-
-Returns the context packet plus metadata as JSON.
-
-```bash
-scoutpack context "fix login redirect loop" --format xml
-```
-
-Returns XML-wrapped context for prompt templates. Supported formats: `markdown`, `json`, `xml`.
-
-```bash
-scoutpack doctor
-scoutpack doctor --json
-scoutpack doctor --fix
-```
-
-Checks index readability, schema and FTS health, filesystem freshness, configuration, language coverage, framework signals, and Git state. `--fix` rebuilds or incrementally refreshes only ScoutPack's local index.
-
-```bash
-scoutpack stats
-```
-
-Shows local index counts and manifest details.
-Builds or refreshes the index first; use `--no-refresh` for a frozen snapshot.
-
-```bash
-scoutpack stats --json
-```
-
-Returns index stats and manifest data as JSON.
-
-```bash
-scoutpack mcp .
-```
-
-Starts a read-only stdio MCP server. Index-backed tools build or incrementally refresh the local index before responding. Tools include `search`, `context`, `template`, `file_summary`, `symbol`, `commands`, `recent_changes`, and `stats`.
-
-```bash
-scoutpack mcp . --http --port 7777
-```
-
-Starts the same MCP tools over local Streamable HTTP/SSE at `http://127.0.0.1:7777/mcp`.
-
-```bash
-scoutpack completions zsh > _scoutpack
-```
-
-Generates shell completions for `bash`, `zsh`, `fish`, `powershell`, or `elvish`.
-
-## Supported Today
-
-| Area | Support |
+| Client | Start here |
 | --- | --- |
-| JavaScript / JSX | tree-sitter symbols, imports, CommonJS requires, functions, classes, components, route handlers |
-| TypeScript / TSX | tree-sitter symbols, imports, functions, components, route handlers |
-| Python | tree-sitter functions, classes, imports, FastAPI-style route decorators, `pyproject.toml`, `requirements.txt`, `Pipfile`, `setup.cfg` |
-| Rust | tree-sitter functions, structs, enums, traits, impl blocks, modules, use imports |
-| Go | tree-sitter packages, imports, functions, methods, structs, interfaces, `go.mod` |
-| Solidity | tree-sitter contracts, interfaces, libraries, functions, modifiers, events, imports |
-| Markdown | heading-based sections |
-| JSON | package scripts, dependencies, framework signals |
-| YAML / TOML | config chunks |
-| Search | SQLite FTS5 plus deterministic ranking |
-| Optional semantic search | local fastembed embeddings behind `--features semantic`; never enabled by default |
-| Context | markdown packets with budget-aware snippets |
-| Templates | built-in and custom Markdown prompt templates |
-| MCP | read-only stdio and HTTP/SSE server with automatic local index refresh |
-| Distribution | Cargo install plus generated shell completions |
-| Privacy | local-only index, sensitive file skips |
+| Codex | [Text handoff and MCP setup](docs/ai-agent-workflows.md#codex) |
+| Claude Code | [Project MCP config and text handoff](docs/ai-agent-workflows.md#claude-code) |
+| Cursor | [Focused task context](docs/ai-agent-workflows.md#cursor) |
+| GitHub Copilot / VS Code | [VS Code MCP config](docs/ai-agent-workflows.md#github-copilot-in-vs-code) |
+| Aider | [Choose files from search results](docs/ai-agent-workflows.md#aider) |
 
-## Not In Scope Yet
+Config formats differ by client. The MCP `context` tool does not currently expose the CLI's Git scope flags; use CLI for commit-pinned review packets. Local Streamable HTTP/SSE setup is documented in [MCP reference](docs/mcp.md).
 
-- cloud sync
-- GUI
-- auto-edits
-- running package scripts
-- executing project commands from watch mode
+## Supported Languages
 
-## Privacy And Security Guarantees
+| Language | Indexed structure |
+| --- | --- |
+| JavaScript / JSX | Functions, classes, components, imports, CommonJS requires, route handlers |
+| TypeScript / TSX | Functions, types, interfaces, components, imports, route handlers |
+| Python | Functions, classes, imports, FastAPI-style routes; common project/dependency config |
+| Rust | Functions, structs, enums, traits, impl blocks, modules, use imports |
+| Go | Functions, methods, structs, interfaces, packages, imports, `go.mod` |
+| Solidity | Contracts, interfaces, libraries, functions, modifiers, events, imports |
+| Markdown, JSON, YAML, TOML | Document sections, config chunks, package scripts and framework signals |
 
-ScoutPack is offline by design:
+Structure extraction is lightweight parsing, not full compiler or language-server analysis. Import and call expansion are heuristic; same-name relationships can be ambiguous.
 
-- does not send code anywhere
-- does not call external APIs in default FTS mode
-- optional semantic mode may download a local embedding model only after confirmation
-- does not collect telemetry
-- does not run project commands
-- writes local SQLite index data only under `.scoutpack/`
-- supports `.scoutpackignore`
-- skips common secret files such as `.env`, `.env.local`, private keys, certificates, `.npmrc`, `.pypirc`, `secrets.yaml`, and `secrets.json`
-- skips common generated folders such as `node_modules`, `.git`, `.next`, `dist`, `build`, `coverage`, `target`, and `.venv`
+## Privacy And Local Storage
 
-Limit: ScoutPack is not a secret scanner. Review generated context before pasting it into any external AI provider.
+- Default mode uses local SQLite/FTS5 and tree-sitter. No model calls, code uploads, or telemetry.
+- ScoutPack does not edit source files or execute suggested project commands.
+- It respects `.gitignore` and `.scoutpackignore`, skips common sensitive patterns, and excludes generated folders, binary files, and oversized files.
+- Ordinary queries store local index data in `.scoutpack/`. Git-scoped queries build and remove a temporary commit index.
+- Optional semantic builds can download a model after confirmation. They are not included in default installs.
 
-Security details: [SECURITY.md](SECURITY.md).
+Keep `.scoutpack/` out of version control. Sensitive-pattern filtering is not a complete secret scanner: inspect output before sharing. [Security policy](SECURITY.md) · [Ignore-file setup](docs/getting-started.md#configure-what-gets-indexed).
 
-## Docs
+## When ScoutPack Helps
 
-- [Installation](docs/installation.md)
-- [Distribution](docs/distribution.md)
-- [Why ScoutPack](WHY.md)
-- [Positioning](docs/positioning.md)
-- [Risk hints](docs/risk-hints.md)
-- [Demo](docs/demo.md)
-- [Comparison](docs/comparison.md)
-- [MCP server](docs/mcp.md)
-- [Prompt templates](docs/templates.md)
-- [AI agent workflows](docs/ai-agent-workflows.md)
-- [Use cases](docs/use-cases.md)
-- [FAQ](docs/faq.md)
-- [Design](docs/design.md)
-- [Milestones](docs/milestones.md)
-- [Release checklist](docs/release-checklist.md)
-- [Roadmap](ROADMAP.md)
-- [Changelog](CHANGELOG.md)
+Use ScoutPack when you want explicit file selection, local indexing, or commit-identified context you can hand between tools. Native agent search may already be sufficient for a small repository or a simple task.
 
-## Development
+Existing [benchmark results](benches/RESULTS.md) measure retrieval and compression, not proven reductions in agent cost or time to a correct edit. Final-packet and native-agent evaluation remain planned. [Methodology](docs/benchmarks.md) · [Comparison and limitations](docs/comparison.md) · [Why this exists](WHY.md).
+
+## Documentation And Help
+
+| Need | Guide |
+| --- | --- |
+| First successful packet or troubleshooting | [Getting started](docs/getting-started.md) |
+| Install, upgrade, or remove ScoutPack | [Installation](docs/installation.md) |
+| Understand budgets, privacy, or Git scope | [FAQ](docs/faq.md) |
+| Use built-in or custom prompts | [Templates](docs/templates.md) |
+| Browse all guides | [Documentation index](docs/README.md) |
+| Report a reproducible problem | [Bug report](https://github.com/theamodhshetty/ScoutPack/issues/new?template=bug_report.yml) |
+| Suggest a workflow improvement | [Feature request](https://github.com/theamodhshetty/ScoutPack/issues/new?template=feature_request.yml) |
+
+## Contributing
 
 ```bash
 cargo fmt --check
-cargo test
+cargo clippy --locked --all-targets -- -D warnings
+cargo test --locked
 ```
 
-Contributing guide: [CONTRIBUTING.md](CONTRIBUTING.md).
+[Contributing](CONTRIBUTING.md) · [Roadmap](ROADMAP.md) · [Milestones](docs/milestones.md) · [Changelog](CHANGELOG.md)
 
-## License
-
-MIT. See [LICENSE](LICENSE).
+MIT licensed. [License](LICENSE).

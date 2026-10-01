@@ -36,6 +36,8 @@ All notable ScoutPack changes are tracked here.
 
 ### Changed
 
+- Reorganized README around installation, task-based workflows, local MCP search, and concise language/privacy support. Added documentation index and first-run troubleshooting; clarified unpublished binary installation and removed keyword stuffing.
+
 - Git-scoped context now reads a temporary index of the resolved content commit, includes full base/content commit IDs, and excludes staged, unstaged, and untracked content. Branch mode uses the merge base with main; explicit diff keeps two-endpoint semantics. Git-scoped semantic search reports an actionable unsupported-combination error.
 
 - Reordered active roadmap and milestones around whole-packet budget correctness, review evidence, verified installation, and measured external use; retained previous milestone planning as superseded history.

@@ -5,7 +5,6 @@ ScoutPack works with any AI coding tool that accepts text context or supports MC
 ## Recommended Flow
 
 ```bash
-scoutpack pack .
 scoutpack context "describe the task" --budget 2500
 ```
 
@@ -31,7 +30,6 @@ scoutpack template bugfix "describe the bug" --budget 2500
 ## Codex
 
 ```bash
-scoutpack pack .
 scoutpack context "implement account settings page" --budget 3000
 ```
 
@@ -54,7 +52,7 @@ MCP mode with project config:
   "mcpServers": {
     "scoutpack": {
       "command": "scoutpack",
-      "args": ["mcp", "."]
+      "args": ["mcp", "/absolute/path/to/your-project"]
     }
   }
 }
@@ -79,7 +77,7 @@ Add `.vscode/mcp.json`:
     "scoutpack": {
       "type": "stdio",
       "command": "scoutpack",
-      "args": ["mcp", "."]
+      "args": ["mcp", "/absolute/path/to/your-project"]
     }
   }
 }
@@ -118,11 +116,10 @@ This is useful for scripts, wrappers, and clients that prefer direct JSON output
 For clients that support MCP, run ScoutPack as a read-only stdio server. Index-backed tools build and refresh ScoutPack's local index automatically:
 
 ```bash
-scoutpack pack .
 scoutpack mcp .
 ```
 
-The MCP server exposes `search`, `context`, `template`, `file_summary`, `symbol`, `commands`, and `stats`. See [MCP server](mcp.md).
+The MCP server exposes `search`, `context`, `template`, `file_summary`, `symbol`, `commands`, `recent_changes`, and `stats`. Use absolute project paths for clients. CLI Git flags are not exposed by MCP `context`; use CLI for committed packets. See [MCP server](mcp.md).
 
 ## AGENTS.md Hint
 
@@ -131,7 +128,7 @@ Add this to a repo `AGENTS.md` when you want agents to remember ScoutPack:
 ```md
 Before broad repo exploration, run ScoutPack:
 
-- `scoutpack pack .` if `.scoutpack/pack.sqlite` is missing or stale.
+- Ordinary ScoutPack queries build and refresh their index automatically.
 - `scoutpack context "<task>" --budget 2500` for a task packet.
 - `scoutpack template bugfix "<task>" --budget 2500` for an agent-ready prompt.
 - Prefer ScoutPack MCP tools when available: `search`, `context`, `template`, `file_summary`, `symbol`, `commands`, `stats`.
