@@ -6,6 +6,8 @@ All notable ScoutPack changes are tracked here.
 
 ### Added
 
+- MCP `context` Git scopes (`since`, `diff`, `branch`) for commit-pinned review packets, with schema discovery and dirty-tree regression coverage.
+
 - `scoutpack doctor` health and freshness diagnostics with text, JSON, and `--fix` modes.
 - Automatic first-use and stale-index refresh for `search`, `context`, `template`, and index-backed MCP tools, with `--no-refresh` for frozen CLI queries.
 - Pinned real-repo retrieval benchmarks with Top-1/3/5 hits and expected-file coverage.
@@ -35,6 +37,8 @@ All notable ScoutPack changes are tracked here.
 - GitHub issue templates and pull request template.
 
 ### Changed
+
+- Git-scoped MCP context/template requests avoid working-tree refresh; invalid or conflicting scopes fail before indexing. MCP rejects malformed and three-dot diff ranges.
 
 - Reorganized README around installation, task-based workflows, local MCP search, and concise language/privacy support. Added documentation index and first-run troubleshooting; clarified unpublished binary installation and removed keyword stuffing.
 

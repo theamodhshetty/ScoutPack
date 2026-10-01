@@ -26,4 +26,6 @@ ScoutPack is a local repository index and context compiler for AI coding agents.
 
 [Distribution](distribution.md) and [release checklist](release-checklist.md) describe preparation. Templates do not mean a package or binary has been published.
 
+[Next investment decision](next-steps-2026-10-02.md) explains the current research, narrow review-evidence focus, and validation gates.
+
 [Report a bug](https://github.com/theamodhshetty/ScoutPack/issues/new?template=bug_report.yml) using a public minimal fixture. Never attach private context or secrets. [Security reports](../SECURITY.md).

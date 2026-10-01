@@ -1112,6 +1112,18 @@ fn git_aware_context_scopes_to_changed_files() {
         assert!(out.contains("+"), "{out}");
     }
 
+    fs::write(
+        temp.path().join("src/lib/review.ts"),
+        "export function dirtyReviewOnly() { return 'dirty'; }\n",
+    )
+    .unwrap();
+    let head = Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    let head = String::from_utf8(head.stdout).unwrap().trim().to_owned();
+
     let mut mcp = Command::new(bin())
         .args(["mcp", "."])
         .current_dir(temp.path())
@@ -1137,6 +1149,27 @@ fn git_aware_context_scopes_to_changed_files() {
             r#"{{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{{"name":"recent_changes","arguments":{{"diff":"main..HEAD"}}}}}}"#
         )
         .unwrap();
+        writeln!(
+            stdin,
+            "{}",
+            serde_json::json!({"jsonrpc":"2.0","id":3,"method":"tools/list","params":{}})
+        )
+        .unwrap();
+        for (id, scope) in [
+            (4, serde_json::json!({"branch":true})),
+            (5, serde_json::json!({"diff":"main..HEAD"})),
+            (6, serde_json::json!({"since":"main"})),
+            (7, serde_json::json!({})),
+            (8, serde_json::json!({"branch":true,"since":"main"})),
+        ] {
+            let mut arguments = scope;
+            arguments["task"] = "review auth changes".into();
+            if id == 7 {
+                arguments["task"] = "dirtyReviewOnly".into();
+            }
+            arguments["budget"] = 3000.into();
+            writeln!(stdin, "{}", serde_json::json!({"jsonrpc":"2.0","id":id,"method":"tools/call","params":{"name":"context","arguments":arguments}})).unwrap();
+        }
     }
     drop(mcp.stdin.take());
     let mcp_output = mcp.wait_with_output().unwrap();
@@ -1155,6 +1188,30 @@ fn git_aware_context_scopes_to_changed_files() {
         .clone();
     assert_eq!(recent["base"], "main");
     assert_eq!(recent["head"], "HEAD");
+    let tools = &messages.iter().find(|message| message["id"] == 3).unwrap()["result"]["tools"];
+    let schema = &tools
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|tool| tool["name"] == "context")
+        .unwrap()["inputSchema"]["properties"];
+    for field in ["since", "diff", "branch", "expand_calls"] {
+        assert!(schema.get(field).is_some(), "missing {field}");
+    }
+    for id in [4, 5, 6] {
+        let result = &messages.iter().find(|message| message["id"] == id).unwrap()["result"]
+            ["structuredContent"];
+        let packet = result["packet"].as_str().unwrap();
+        assert!(packet.contains(&head), "{packet}");
+        assert!(packet.contains("reviewAuthChange"), "{packet}");
+        assert!(!packet.contains("dirtyReviewOnly"), "{packet}");
+        assert!(result["estimated_tokens"].as_u64().unwrap() <= 3000);
+    }
+    let ordinary = &messages.iter().find(|message| message["id"] == 7).unwrap()["result"]
+        ["structuredContent"]["packet"];
+    assert!(ordinary.as_str().unwrap().contains("dirtyReviewOnly"));
+    let invalid = messages.iter().find(|message| message["id"] == 8).unwrap();
+    assert!(invalid.to_string().contains("Use only one"), "{invalid}");
     assert!(recent["changes"]
         .as_array()
         .unwrap()
