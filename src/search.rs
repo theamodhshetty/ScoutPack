@@ -20,6 +20,18 @@ pub struct SearchResult {
     pub reason: String,
 }
 
+pub fn compare_results(a: &SearchResult, b: &SearchResult) -> Ordering {
+    b.score
+        .total_cmp(&a.score)
+        .then_with(|| a.path.cmp(&b.path))
+        .then_with(|| a.start_line.cmp(&b.start_line))
+        .then_with(|| a.end_line.cmp(&b.end_line))
+        .then_with(|| a.name.cmp(&b.name))
+        .then_with(|| a.kind.cmp(&b.kind))
+        .then_with(|| a.reason.cmp(&b.reason))
+        .then_with(|| a.text.cmp(&b.text))
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct SearchOptions {
     pub semantic: bool,
@@ -80,7 +92,7 @@ pub fn search_repo_with_options(
          JOIN chunks c ON chunks_fts.rowid = c.id
          JOIN files f ON c.file_id = f.id
          WHERE chunks_fts MATCH ?1
-         ORDER BY rank
+         ORDER BY rank, f.path, c.start_line, c.end_line, c.name, c.kind, c.text
          LIMIT ?2",
     )?;
     let rows = stmt.query_map(params![fts, (limit * 5).max(limit) as i64], |row| {
@@ -121,7 +133,7 @@ pub fn search_repo_with_options(
         )?;
         merge_semantic_results(&mut results, semantic_results, options.semantic_alpha);
     }
-    results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(Ordering::Equal));
+    results.sort_by(compare_results);
     results.truncate(limit);
     Ok(results)
 }
@@ -177,7 +189,9 @@ pub fn enrich_with_import_neighbors(
     }
 
     let mut neighbors = Vec::new();
-    for (path, reasons) in neighbor_reasons {
+    for (path, mut reasons) in neighbor_reasons {
+        reasons.sort();
+        reasons.dedup();
         if let Some(result) = best_chunk_for_path(&conn, &path, show_snippets)? {
             neighbors.push(SearchResult {
                 score: result.score + source_file_boost(&path) + 0.2,
@@ -187,7 +201,7 @@ pub fn enrich_with_import_neighbors(
         }
     }
 
-    neighbors.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(Ordering::Equal));
+    neighbors.sort_by(compare_results);
     neighbors.truncate(limit);
     Ok(neighbors)
 }
@@ -257,7 +271,7 @@ pub fn expand_call_graph(
         frontier = next;
     }
 
-    expanded.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(Ordering::Equal));
+    expanded.sort_by(compare_results);
     expanded.dedup_by(|a, b| {
         a.path == b.path && a.start_line == b.start_line && a.end_line == b.end_line
     });
@@ -337,7 +351,8 @@ fn call_edges_from_symbols(
     let mut stmt = conn.prepare(
         "SELECT f.path, e.from_symbol, e.to_symbol, e.line
          FROM symbol_edges e
-         JOIN files f ON e.from_file_id = f.id",
+         JOIN files f ON e.from_file_id = f.id
+         ORDER BY f.path, e.line, e.from_symbol, e.to_symbol",
     )?;
     let rows = stmt.query_map([], |row| {
         Ok(CallEdgeRow {
@@ -371,7 +386,7 @@ fn chunks_for_symbol(
           AND c.start_line <= s.start_line
           AND c.end_line >= s.end_line
          WHERE s.name = ?1
-         ORDER BY f.path, s.start_line
+         ORDER BY f.path, s.start_line, s.end_line, s.kind, s.name, c.start_line, c.end_line, c.kind, c.text
          LIMIT 8",
     )?;
     let rows = stmt.query_map(params![symbol], |row| {
@@ -400,7 +415,8 @@ fn add_symbol_matches(
     let mut stmt = conn.prepare(
         "SELECT f.path, s.kind, s.name, s.start_line, s.end_line
          FROM symbols s
-         JOIN files f ON s.file_id = f.id",
+         JOIN files f ON s.file_id = f.id
+         ORDER BY f.path, s.start_line, s.end_line, s.name, s.kind",
     )?;
     let rows = stmt.query_map([], |row| {
         Ok((
@@ -544,7 +560,8 @@ fn imports_for_paths(conn: &Connection, paths: &[&str]) -> Result<Vec<(String, S
     let mut stmt = conn.prepare(
         "SELECT f.path, i.to_path
          FROM imports i
-         JOIN files f ON i.from_file_id = f.id",
+         JOIN files f ON i.from_file_id = f.id
+         ORDER BY f.path, i.to_path",
     )?;
     let rows = stmt.query_map([], |row| {
         Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
@@ -583,7 +600,7 @@ fn best_chunk_for_path(
            WHEN 'type' THEN 3
            WHEN 'interface' THEN 4
            ELSE 5
-         END, c.start_line
+         END, c.start_line, c.end_line, c.name, c.kind, c.text
          LIMIT 1",
     )?;
     let result = stmt
@@ -656,6 +673,50 @@ fn normalize_path(path: &Path) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn equal_scores_use_path_and_range_tie_breakers() {
+        let base = SearchResult {
+            path: "b.ts".into(),
+            kind: "function".into(),
+            name: Some("auth".into()),
+            start_line: 1,
+            end_line: 3,
+            text: None,
+            score: 1.0,
+            reason: "match".into(),
+        };
+        let mut results = [
+            base.clone(),
+            SearchResult {
+                path: "a.ts".into(),
+                start_line: 2,
+                ..base.clone()
+            },
+            SearchResult {
+                path: "a.ts".into(),
+                end_line: 2,
+                ..base.clone()
+            },
+            SearchResult {
+                path: "a.ts".into(),
+                ..base
+            },
+        ];
+        results.sort_by(compare_results);
+        assert_eq!(
+            results
+                .iter()
+                .map(|r| (r.path.as_str(), r.start_line, r.end_line))
+                .collect::<Vec<_>>(),
+            vec![
+                ("a.ts", 1, 2),
+                ("a.ts", 1, 3),
+                ("a.ts", 2, 3),
+                ("b.ts", 1, 3)
+            ]
+        );
+    }
 
     #[test]
     fn source_boost_covers_every_supported_code_language() {

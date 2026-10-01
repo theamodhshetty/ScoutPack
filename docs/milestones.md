@@ -6,15 +6,16 @@ Updated October 1, 2026. This active queue supersedes the historical launch-firs
 
 ### M12: Output Correctness
 
-Status: in progress. Whole-packet budget enforcement implemented; boundary and broader replay work remain.
+Status: in progress. Whole-packet budgets, default ranking replay, and ordinary source-file boundary fixtures implemented. Hostile filesystem race and index-storage hardening remain separate gates.
 
 - [x] Reproduce oversized fallback output with a unit and CLI regression fixture.
 - [x] Document estimator and payload/wrapper budget scope.
 - [x] Budget every section; return actionable errors below minimum useful size.
 - [x] Cover long tasks, many commands, Git summaries, Unicode, empty results, and small/default budgets.
-- [ ] Add stable score/path/range tie-breakers and replay tests in a separate PR.
-- [ ] Test canonical-root containment, symlinks, and regular-file boundaries; fix confirmed failures.
-- [ ] Qualify README guarantees until corresponding gates pass.
+- [x] Add stable score/path/range tie-breakers and replay tests in a separate PR.
+- [x] Test canonical-root containment, symlinks, and regular-file boundaries; fix confirmed failures for ordinary source scanning.
+- [x] Qualify README guarantees until corresponding gates pass.
+- [ ] Harden configuration/index-storage paths and atomic source reads against hostile filesystem replacement; validate supported platforms.
 
 Exit: successful packets honor documented estimated budgets, and deterministic/boundary fixtures pass. Estimated counts are not exact provider token counts.
 

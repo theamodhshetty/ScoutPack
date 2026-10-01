@@ -136,10 +136,13 @@ Structure extraction is lightweight parsing, not full compiler or language-serve
 - Default mode uses local SQLite/FTS5 and tree-sitter. No model calls, code uploads, or telemetry.
 - ScoutPack does not edit source files or execute suggested project commands.
 - It respects `.gitignore` and `.scoutpackignore`, skips common sensitive patterns, and excludes generated folders, binary files, and oversized files.
+- Source scanning skips symlinks and non-regular files, including links to files outside the canonical repository root.
 - Ordinary queries store local index data in `.scoutpack/`. Git-scoped queries build and remove a temporary commit index.
 - Optional semantic builds can download a model after confirmation. They are not included in default installs.
 
 Keep `.scoutpack/` out of version control. Sensitive-pattern filtering is not a complete secret scanner: inspect output before sharing. [Security policy](SECURITY.md) · [Ignore-file setup](docs/getting-started.md#configure-what-gets-indexed).
+
+Default keyword packets have stable ranking tie-breakers and replay regression coverage across processes and index rebuilds. Same output requires unchanged content, configuration, query, budget, and ScoutPack version. Filesystem races, metadata-preserving edits, and optional semantic output are outside that tested replay contract. See [design limits](docs/design.md#replay-and-file-boundaries).
 
 ## When ScoutPack Helps
 

@@ -404,7 +404,7 @@ pub fn read_commands(conn: &Connection) -> Result<Vec<(String, String, String)>>
            WHEN 'typecheck' THEN 2
            WHEN 'build' THEN 3
            ELSE 4
-         END, name",
+         END, name, command, source",
     )?;
     let rows = stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))?;
     rows.collect::<rusqlite::Result<Vec<_>>>()
@@ -525,14 +525,16 @@ pub fn find_symbols(conn: &Connection, query: &str, limit: usize) -> Result<Vec<
 
 pub fn framework_signals(conn: &Connection) -> Result<Vec<String>> {
     let mut stmt = conn.prepare(
-        "SELECT text FROM chunks
-         WHERE kind IN (
+        "SELECT c.text FROM chunks c
+         JOIN files f ON c.file_id = f.id
+         WHERE c.kind IN (
            'package-dependencies',
            'python-dependencies',
            'python-config',
            'go-module',
            'go-dependencies'
          )
+         ORDER BY f.path, c.start_line, c.end_line, c.kind, c.name, c.text
          LIMIT 25",
     )?;
     let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
@@ -563,6 +565,7 @@ pub fn framework_signals(conn: &Connection) -> Result<Vec<String>> {
             }
         }
     }
+    signals.sort();
     Ok(signals)
 }
 
