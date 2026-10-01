@@ -24,7 +24,35 @@ No. It reads package scripts from `package.json`, but it does not execute projec
 
 ## What languages work today?
 
-v0.1 is strongest for TypeScript, TSX, Next.js-style repos, Markdown, JSON, YAML, and TOML.
+Current development code supports JavaScript/JSX, TypeScript/TSX, Python, Rust, Go, and Solidity symbols, plus Markdown, JSON, YAML, and TOML. Published v0.1.0 contains an older feature set; check installation source when comparing behavior.
+
+## Do I need init and pack before every task?
+
+No. Ordinary queries build and refresh automatically. `init` creates optional config/ignore files; `pack` provides explicit indexing. [Getting started](getting-started.md).
+
+## Can ScoutPack review uncommitted work?
+
+Ordinary `context` reads the working-tree index. Git-scoped `--branch`, `--diff`, and `--since` read committed content only, with full base/content commit IDs. Use ordinary context for staged, unstaged, or untracked work.
+
+## Is the token budget exact?
+
+Only relative to ScoutPack's heuristic estimator, not a provider tokenizer. Successful Markdown packets fit their estimated budget. JSON/XML envelopes and template instructions are excluded. Too-small requests fail clearly.
+
+## Can I install without Rust?
+
+Binary infrastructure is prepared, but last checked v0.1.0 had no binary assets. Use Cargo source installation today. Homebrew/Scoop templates are not published packages. [Installation status](installation.md).
+
+## Does a smaller packet mean better agent results?
+
+No. Benchmarks measure retrieval and compression; compact packets can omit necessary code/tests. Compare review outcomes and total task cost before claiming productivity gains. [Benchmark limits](benchmarks.md).
+
+## Does MCP context support Git scope?
+
+Current MCP `context` schema supports task, budget, and call expansion, not CLI Git flags. Use CLI for committed review packets; `recent_changes` provides a summary separately. [MCP reference](mcp.md).
+
+## Where should I start if something fails?
+
+[Troubleshooting](getting-started.md#troubleshooting), `scoutpack doctor`, and a public minimal fixture with installation source/version. Never attach private context or credentials.
 
 ## Why not build MCP first?
 

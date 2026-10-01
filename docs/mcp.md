@@ -18,6 +18,8 @@ scoutpack mcp . --http --port 7777
 
 Most MCP clients use one of two local stdio config shapes.
 
+Use an absolute project path in client configs to avoid depending on their working directory. Use the full ScoutPack executable path too if the client does not inherit your shell PATH.
+
 Claude Code, Cursor-style, and many MCP clients:
 
 ```json
@@ -25,7 +27,7 @@ Claude Code, Cursor-style, and many MCP clients:
   "mcpServers": {
     "scoutpack": {
       "command": "scoutpack",
-      "args": ["mcp", "."]
+      "args": ["mcp", "/absolute/path/to/your-project"]
     }
   }
 }
@@ -39,7 +41,7 @@ VS Code / GitHub Copilot workspace config:
     "scoutpack": {
       "type": "stdio",
       "command": "scoutpack",
-      "args": ["mcp", "."]
+      "args": ["mcp", "/absolute/path/to/your-project"]
     }
   }
 }

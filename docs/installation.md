@@ -37,16 +37,18 @@ scoutpack --help
 
 ## Install From Release Binary
 
+Conditional release infrastructure, not the recommended first-run path today: at the October 1, 2026 check, `v0.1.0` had no binary assets. Use Cargo installation until a release includes binaries and checksums. Confirm assets on [GitHub Releases](https://github.com/theamodhshetty/ScoutPack/releases) before using commands below.
+
 macOS/Linux users can install from GitHub Releases without a local Rust toolchain:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/theamodhshetty/ScoutPack/main/install.sh | sh
 ```
 
-Install a specific release:
+Once binaries are published, select their tag with `--version`. Do not use `v0.1.0` unless assets have actually been attached. From a ScoutPack checkout, inspect installer options:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/theamodhshetty/ScoutPack/main/install.sh | sh -s -- --version v0.1.0
+sh install.sh --help
 ```
 
 Install into a custom directory:
@@ -121,10 +123,10 @@ Ensure `~/.zfunc` is in your `fpath` before `compinit`.
 Inside a project repo:
 
 ```bash
-scoutpack init
-scoutpack pack .
 scoutpack context "describe the task here" --budget 2500
 ```
+
+Queries build and refresh automatically. Use `init` for optional config/ignore files or `pack` for explicit indexing. [Getting started and troubleshooting](getting-started.md).
 
 Generated files:
 
@@ -133,9 +135,9 @@ Generated files:
   pack.sqlite
   manifest.json
   repo-map.md
-scoutpack.toml
-.scoutpackignore
 ```
+
+Optional `init` creates `scoutpack.toml` and `.scoutpackignore` separately.
 
 `.scoutpack/` is local index data and should not be committed.
 
@@ -153,7 +155,6 @@ Use JSON output when building wrappers and scripts.
 For MCP clients:
 
 ```bash
-scoutpack pack .
 scoutpack mcp .
 ```
 
