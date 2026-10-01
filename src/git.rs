@@ -22,6 +22,8 @@ pub struct GitChange {
 pub struct RecentChanges {
     pub base: String,
     pub head: String,
+    pub base_commit: String,
+    pub head_commit: String,
     pub files_changed: usize,
     pub insertions: usize,
     pub deletions: usize,
@@ -96,16 +98,25 @@ pub fn recent_changes(root: &Path, mode: &GitContextMode) -> Result<RecentChange
         GitContextMode::Diff { base, head } => diff_range(&repo, base, head),
         GitContextMode::Branch => {
             let base = default_main_ref(&repo)?;
-            diff_range(&repo, &base, "HEAD")
+            let base_id = repo.revparse_single(&base)?.peel_to_commit()?.id();
+            let head_id = repo.revparse_single("HEAD")?.peel_to_commit()?.id();
+            let merge_base = repo.merge_base(base_id, head_id)?;
+            diff_range(&repo, &merge_base.to_string(), &head_id.to_string())
         }
     }
 }
 
 fn diff_range(repo: &Repository, base: &str, head: &str) -> Result<RecentChanges> {
-    let base_tree =
-        rev_to_tree(repo, base).with_context(|| format!("Could not resolve git ref `{base}`"))?;
-    let head_tree =
-        rev_to_tree(repo, head).with_context(|| format!("Could not resolve git ref `{head}`"))?;
+    let base_commit = repo
+        .revparse_single(base)
+        .and_then(|obj| obj.peel_to_commit())
+        .with_context(|| format!("Could not resolve git ref `{base}`"))?;
+    let head_commit = repo
+        .revparse_single(head)
+        .and_then(|obj| obj.peel_to_commit())
+        .with_context(|| format!("Could not resolve git ref `{head}`"))?;
+    let base_tree = base_commit.tree()?;
+    let head_tree = head_commit.tree()?;
     let mut options = DiffOptions::new();
     let diff = repo.diff_tree_to_tree(Some(&base_tree), Some(&head_tree), Some(&mut options))?;
     let stats = diff.stats()?;
@@ -139,6 +150,8 @@ fn diff_range(repo: &Repository, base: &str, head: &str) -> Result<RecentChanges
     Ok(RecentChanges {
         base: base.to_owned(),
         head: head.to_owned(),
+        base_commit: base_commit.id().to_string(),
+        head_commit: head_commit.id().to_string(),
         files_changed: stats.files_changed(),
         insertions: stats.insertions(),
         deletions: stats.deletions(),
@@ -146,9 +159,85 @@ fn diff_range(repo: &Repository, base: &str, head: &str) -> Result<RecentChanges
     })
 }
 
-fn rev_to_tree<'repo>(repo: &'repo Repository, rev: &str) -> Result<Tree<'repo>> {
-    let object = repo.revparse_single(rev)?;
-    Ok(object.peel_to_commit()?.tree()?)
+/// Materialize regular, eligible blobs only; never check out symlinks or execute hooks.
+pub fn snapshot(root: &Path, commit: &str) -> Result<tempfile::TempDir> {
+    let repo = Repository::discover(root)?;
+    let workdir = repo
+        .workdir()
+        .context("Git context requires a working repository")?
+        .canonicalize()?;
+    anyhow::ensure!(
+        root.canonicalize()? == workdir,
+        "Git context must run from repository root: {}",
+        workdir.display()
+    );
+    let tree = repo.find_commit(git2::Oid::from_str(commit)?)?.tree()?;
+    let snapshot = tempfile::tempdir()?;
+    let config = crate::config::load(root)?;
+    write_tree(
+        &repo,
+        &tree,
+        Path::new(""),
+        snapshot.path(),
+        config.max_file_size_kb.saturating_mul(1024),
+    )?;
+    // Use the user's current restrictive policy as well as committed ignore rules.
+    for name in [".scoutpackignore", ".gitignore"] {
+        let local = root.join(name);
+        if local.is_file() {
+            let mut rules = std::fs::read_to_string(snapshot.path().join(name)).unwrap_or_default();
+            rules.push('\n');
+            rules.push_str(&std::fs::read_to_string(local)?);
+            std::fs::write(snapshot.path().join(name), rules)?;
+        }
+    }
+    // Make the walker honor committed .gitignore files without consulting parent repos.
+    std::fs::create_dir(snapshot.path().join(".git"))?;
+    crate::index::pack_repo(snapshot.path())?;
+    Ok(snapshot)
+}
+
+fn write_tree(
+    repo: &Repository,
+    tree: &Tree<'_>,
+    relative: &Path,
+    destination: &Path,
+    max_bytes: u64,
+) -> Result<()> {
+    for entry in tree {
+        let name = entry
+            .name()
+            .context("Git snapshot contains a non-UTF8 path")?;
+        anyhow::ensure!(
+            name != "." && name != ".." && !name.contains(['/', '\\']),
+            "Unsafe Git path"
+        );
+        let path = relative.join(name);
+        if crate::scanner::is_default_ignored(&path) || crate::scanner::is_sensitive_path(&path) {
+            continue;
+        }
+        if entry.kind() == Some(git2::ObjectType::Tree) {
+            write_tree(
+                repo,
+                &repo.find_tree(entry.id())?,
+                &path,
+                destination,
+                max_bytes,
+            )?;
+        } else if matches!(entry.filemode(), 0o100644 | 0o100755)
+            && (crate::scanner::classify_path(&path).is_some()
+                || matches!(name, ".gitignore" | ".scoutpackignore"))
+        {
+            let blob = repo.find_blob(entry.id())?;
+            if blob.size() as u64 > max_bytes {
+                continue;
+            }
+            let target = destination.join(path);
+            std::fs::create_dir_all(target.parent().context("Missing snapshot parent")?)?;
+            std::fs::write(target, blob.content())?;
+        }
+    }
+    Ok(())
 }
 
 fn default_main_ref(repo: &Repository) -> Result<String> {

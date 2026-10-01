@@ -92,7 +92,7 @@ pub enum Commands {
         #[arg(long)]
         diff: Option<String>,
 
-        /// Scope context to files changed on the current branch against main.
+        /// Scope committed context from the merge base of main and HEAD to HEAD.
         #[arg(long, default_value_t = false)]
         branch: bool,
 
@@ -133,7 +133,7 @@ pub enum Commands {
         #[arg(long)]
         diff: Option<String>,
 
-        /// Scope context to files changed on the current branch against main.
+        /// Scope committed context from the merge base of main and HEAD to HEAD.
         #[arg(long, default_value_t = false)]
         branch: bool,
 

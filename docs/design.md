@@ -11,7 +11,9 @@ Pipeline:
 5. Chunk changed files into meaningful units.
 6. Update only affected files, chunks, symbols, imports, commands, edges, and FTS rows in SQLite.
 7. Query SQLite FTS5.
-8. Render markdown under approximate token budget.
+8. Render the complete Markdown packet under ScoutPack's estimated token budget. If required task/revision metadata and section summaries cannot fit, return an actionable error. JSON/XML wrappers and template framing are outside this budget.
+
+Git-scoped context resolves endpoints once and materializes eligible regular blobs from the content commit into a temporary index. Snippets, symbols, imports, and commands therefore share one revision; dirty working-tree files do not enter the packet. `--branch` uses the merge base with main, while explicit `--diff` compares the supplied endpoint trees. Temporary indexes are deleted after use and rebuilt on each request; this favors correctness over warm-cache latency. Semantic search is unavailable for these snapshots. See [Git-aware context](../examples/git-aware-context.md).
 
 `search`, `context`, `template`, and index-backed MCP tools run this incremental refresh automatically. `--no-refresh` provides explicit frozen-index behavior for CLI queries. `watch` uses the same pipeline after its filesystem debounce.
 

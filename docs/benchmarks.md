@@ -88,7 +88,7 @@ ScoutPack should win only where explicit, portable, local, task-specific context
 
 Good benchmark result:
 
-- packet stays near requested budget
+- successful Markdown packet stays at or below requested budget under ScoutPack's estimator; too-small requests fail explicitly
 - Top-1/3/5 and expected coverage show selected files match likely edit/review areas
 - generated and sensitive files stay skipped
 - incremental pack is fast enough to rerun often

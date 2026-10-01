@@ -96,8 +96,10 @@ async fn main() -> Result<()> {
             expand_calls,
             no_refresh,
         } => {
-            refresh_index(".", no_refresh)?;
             let git_mode = context_git_mode(since, diff, branch)?;
+            if git_mode.is_none() {
+                refresh_index(".", no_refresh)?;
+            }
             let packet = context::build_context_packet_with_options(
                 ".",
                 &task,

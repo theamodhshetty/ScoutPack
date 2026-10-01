@@ -1,5 +1,81 @@
 # Milestones
 
+Updated October 1, 2026. This active queue supersedes the historical launch-first queue below. Individual completed changes are checked; broader milestones remain open until all gates pass.
+
+## Active Execution Queue
+
+### M12: Output Correctness
+
+Status: in progress. Whole-packet budget enforcement implemented; boundary and broader replay work remain.
+
+- [x] Reproduce oversized fallback output with a unit and CLI regression fixture.
+- [x] Document estimator and payload/wrapper budget scope.
+- [x] Budget every section; return actionable errors below minimum useful size.
+- [x] Cover long tasks, many commands, Git summaries, Unicode, empty results, and small/default budgets.
+- [ ] Add stable score/path/range tie-breakers and replay tests in a separate PR.
+- [ ] Test canonical-root containment, symlinks, and regular-file boundaries; fix confirmed failures.
+- [ ] Qualify README guarantees until corresponding gates pass.
+
+Exit: successful packets honor documented estimated budgets, and deterministic/boundary fixtures pass. Estimated counts are not exact provider token counts.
+
+### M13: Review Evidence
+
+Status: in progress. Commit-only Git packets implemented; structured schema and MCP context scope parity remain.
+
+- [ ] Define versioned JSON records for files, ranges, reasons, hashes, omissions, and budget accounting.
+- [x] Define working-tree versus revision content semantics and dirty-tree policy: Git-scoped packets use resolved committed content and exclude dirty files.
+- [x] Use merge base for `--branch`; preserve explicit two-endpoint semantics for `--diff` and document the correction.
+- [ ] Test diverged bases, renames, deletions, dirty files, and historical content.
+- [ ] Expose equivalent Git scope through MCP; update schemas and docs.
+- [ ] Scope commands/frameworks to affected packages rather than unrelated fixtures.
+- [ ] Label ambiguous same-name symbol relationships.
+
+Exit: reviewers can identify exactly which content packets contain and why. Unchanged inputs produce identical canonical payloads; freshness is not snapshot identity.
+
+### M14: Installation And Pilot Workflow
+
+Status: planned; depends on correctness gates.
+
+- [ ] Recheck public release metadata and publish actual verified artifacts through release workflow.
+- [ ] Verify checksums and clean installation on claimed supported platforms.
+- [ ] Validate doctor and one review flow from installed executable.
+- [ ] Test one Codex workflow and one Claude Code workflow.
+- [ ] Recruit five consenting external reviewers and observe installation failures.
+
+Exit: installation and review work outside maintainer checkout. Templates and intended integrations are not proof of compatibility.
+
+### M15: Measured Usefulness
+
+Status: planned; depends on usable pilot.
+
+- [ ] Record executable hash/revision, repository commits, exact commands, and raw artifacts.
+- [ ] Evaluate final-packet recall, useful ranges, unrelated content, and budgets on held-out tasks.
+- [ ] Separate cold index, unchanged refresh, incremental refresh, retrieval-only, and end-to-end latency.
+- [ ] Begin small paired native-agent comparison; set cost cap before expansion.
+- [ ] Report elapsed time, cached/uncached usage where available, accepted findings, failures, and uncertainty.
+- [ ] Observe repeat use without reminders and support burden.
+
+Exit: publish benefits and losses. Compression against a source dump is not proof of productivity. Proposed demand target: three of five pilot users return for at least three tasks over two weeks; not yet achieved.
+
+### M16: Distribution And Investment Decision
+
+Status: planned; depends on evidence.
+
+- [ ] Publish one reproducible public review case study with native baseline and limitations.
+- [ ] Prepare opt-in, least-privilege integration examples users request.
+- [ ] Submit working integrations to catalogs after verification.
+- [ ] Review six-week effort cap; choose continued workflow development, smaller library/CLI scope, or maintenance-only mode.
+
+Exit: investment follows repeated usefulness, not stars or feature count.
+
+## Weekly Operating Loop
+
+One feature PR in flight. Reproduce user failure, choose smallest fix, validate, update docs/changelog, review, commit and push completed work. Release only after installation gates. Reserve one pilot conversation and check that upcoming work addresses observed problems.
+
+## Historical Milestones
+
+The material below preserves previous development history. Its "Next" sequence is superseded by the active queue above. Completion records implementation, not universal correctness guarantees. Rationale: [strategy review](strategy-review-2026-09-25.md).
+
 ScoutPack development stays milestone-driven. Each major milestone should end with:
 
 - focused commit

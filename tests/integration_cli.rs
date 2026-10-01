@@ -42,6 +42,226 @@ fn run_git(path: &Path, args: &[&str]) {
 }
 
 #[test]
+fn context_budget_bounds_complete_packets_and_rejects_tiny_requests() {
+    let temp = tempfile::tempdir().unwrap();
+    copy_dir(Path::new("tests/fixtures/nextjs-basic"), temp.path());
+    for budget in [100, 300, 600, 2000] {
+        let output = Command::new(bin())
+            .args([
+                "context",
+                "fix login redirect loop",
+                "--budget",
+                &budget.to_string(),
+                "--json",
+            ])
+            .current_dir(temp.path())
+            .output()
+            .unwrap();
+        if output.status.success() {
+            let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+            assert!(value["estimated_tokens"].as_u64().unwrap() <= budget);
+            assert!(value["packet"]
+                .as_str()
+                .unwrap()
+                .contains("fix login redirect loop"));
+        } else {
+            assert!(String::from_utf8_lossy(&output.stderr).contains("Budget too small"));
+            assert!(output.stdout.is_empty());
+        }
+    }
+    let output = Command::new(bin())
+        .args(["context", &"long task ".repeat(1000), "--budget", "300"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("Budget too small"));
+    let empty = tempfile::tempdir().unwrap();
+    let output = Command::new(bin())
+        .args(["context", "no matching files", "--budget", "300", "--json"])
+        .current_dir(empty.path())
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert!(value["estimated_tokens"].as_u64().unwrap() <= 300);
+}
+
+#[test]
+fn git_packets_use_pinned_content_and_branch_merge_base() {
+    let temp = tempfile::tempdir().unwrap();
+    run_git(temp.path(), &["init", "-b", "main"]);
+    run_git(
+        temp.path(),
+        &["config", "user.email", "scoutpack@example.com"],
+    );
+    run_git(temp.path(), &["config", "user.name", "ScoutPack Test"]);
+    fs::write(
+        temp.path().join("auth.ts"),
+        "export function login() { return 'BASE'; }\n",
+    )
+    .unwrap();
+    fs::write(
+        temp.path().join("package.json"),
+        r#"{"scripts":{"test":"BASE_TEST"}}"#,
+    )
+    .unwrap();
+    fs::write(temp.path().join(".gitignore"), "ignored.ts\n").unwrap();
+    run_git(temp.path(), &["add", "."]);
+    run_git(temp.path(), &["commit", "-m", "base"]);
+    run_git(temp.path(), &["checkout", "-b", "feature"]);
+    fs::write(
+        temp.path().join("auth.ts"),
+        "export function login() { return 'PINNED_CONTENT'; }\n",
+    )
+    .unwrap();
+    fs::write(
+        temp.path().join("package.json"),
+        r#"{"scripts":{"test":"PINNED_TEST"}}"#,
+    )
+    .unwrap();
+    fs::write(
+        temp.path().join("ignored.ts"),
+        "export const login = 'IGNORED_SECRET';",
+    )
+    .unwrap();
+    fs::write(
+        temp.path().join("secrets.json"),
+        r#"{"login":"SECRET_MARKER"}"#,
+    )
+    .unwrap();
+    #[cfg(unix)]
+    std::os::unix::fs::symlink("secrets.json", temp.path().join("alias.ts")).unwrap();
+    run_git(temp.path(), &["add", "."]);
+    run_git(temp.path(), &["add", "-f", "ignored.ts"]);
+    run_git(temp.path(), &["commit", "-m", "feature"]);
+    run_git(temp.path(), &["tag", "review-head"]);
+    let head = Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    let head = String::from_utf8(head.stdout).unwrap().trim().to_owned();
+    run_git(temp.path(), &["checkout", "main"]);
+    fs::write(
+        temp.path().join("unrelated.ts"),
+        "export const unrelated = 'BASE_ONLY_CHANGE';",
+    )
+    .unwrap();
+    run_git(temp.path(), &["add", "."]);
+    run_git(temp.path(), &["commit", "-m", "advance main"]);
+    run_git(temp.path(), &["checkout", "feature"]);
+    fs::write(
+        temp.path().join("auth.ts"),
+        "export function dirtyLogin() { return 'DIRTY_CONTENT'; }\n",
+    )
+    .unwrap();
+    fs::write(
+        temp.path().join("package.json"),
+        r#"{"scripts":{"test":"DIRTY_TEST"}}"#,
+    )
+    .unwrap();
+    run_git(temp.path(), &["add", "auth.ts"]);
+    fs::write(
+        temp.path().join("untracked.ts"),
+        "export const login = 'UNTRACKED_CONTENT';",
+    )
+    .unwrap();
+    for scope in [
+        vec!["--branch"],
+        vec!["--diff", "main..review-head"],
+        vec!["--since", "main"],
+    ] {
+        let output = Command::new(bin())
+            .args(["context", "review login", "--budget", "3000"])
+            .args(&scope)
+            .current_dir(temp.path())
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let packet = String::from_utf8(output.stdout).unwrap();
+        assert!(
+            packet.contains(&format!("Content commit: `{head}`")),
+            "{packet}"
+        );
+        assert!(packet.contains("PINNED_CONTENT"), "{packet}");
+        assert!(packet.contains("PINNED_TEST"), "{packet}");
+        for forbidden in [
+            "DIRTY_CONTENT",
+            "DIRTY_TEST",
+            "UNTRACKED_CONTENT",
+            "IGNORED_SECRET",
+            "SECRET_MARKER",
+        ] {
+            assert!(!packet.contains(forbidden), "{packet}");
+        }
+        assert!(!packet.contains("```file:alias.ts"), "{packet}");
+        if scope == ["--branch"] {
+            assert!(!packet.contains("unrelated.ts"), "{packet}");
+        }
+    }
+    assert!(!temp.path().join(".scoutpack").exists());
+    assert!(fs::read_to_string(temp.path().join("auth.ts"))
+        .unwrap()
+        .contains("DIRTY_CONTENT"));
+    // Move HEAD beyond the tagged review revision, including a deletion.
+    fs::remove_file(temp.path().join("auth.ts")).unwrap();
+    run_git(temp.path(), &["add", "-u"]);
+    run_git(temp.path(), &["commit", "-m", "delete auth after review"]);
+    let output = Command::new(bin())
+        .args([
+            "context",
+            "review login",
+            "--diff",
+            "main..review-head",
+            "--budget",
+            "3000",
+        ])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let packet = String::from_utf8(output.stdout).unwrap();
+    assert!(packet.contains("PINNED_CONTENT"), "{packet}");
+    assert!(packet.contains(&head), "{packet}");
+    assert!(!packet.contains("DIRTY_TEST"), "{packet}");
+    for budget in [300, 600] {
+        let output = Command::new(bin())
+            .args([
+                "context",
+                "review login",
+                "--diff",
+                "main..review-head",
+                "--budget",
+                &budget.to_string(),
+                "--json",
+            ])
+            .current_dir(temp.path())
+            .output()
+            .unwrap();
+        if output.status.success() {
+            let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+            assert!(value["estimated_tokens"].as_u64().unwrap() <= budget);
+            assert!(value["packet"].as_str().unwrap().contains(&head));
+        } else {
+            assert!(String::from_utf8_lossy(&output.stderr).contains("Budget too small"));
+        }
+    }
+}
+
+#[test]
 fn init_pack_search_context_stats_work() {
     let temp = tempfile::tempdir().unwrap();
     copy_dir(Path::new("tests/fixtures/nextjs-basic"), temp.path());
