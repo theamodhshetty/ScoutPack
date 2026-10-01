@@ -42,6 +42,159 @@ fn run_git(path: &Path, args: &[&str]) {
 }
 
 #[test]
+fn packets_replay_across_processes_and_index_rebuilds() {
+    let root = tempfile::tempdir().unwrap();
+    let mut entry = String::new();
+    for n in 0..10 {
+        entry.push_str(&format!("import {{ helper }} from './helper{n}';\n"));
+        fs::write(
+            root.path().join(format!("helper{n}.ts")),
+            "export function helper() { return true; }\n",
+        )
+        .unwrap();
+    }
+    entry.push_str("export function entryPoint() { return helper(); }\n");
+    fs::write(root.path().join("entry.ts"), entry).unwrap();
+    for n in (0..40).rev() {
+        fs::write(
+            root.path().join(format!("auth{n:02}.ts")),
+            "export function auth() { return true; }\n",
+        )
+        .unwrap();
+    }
+    for (package, framework, command) in [("z-app", "next", "z-test"), ("a-app", "vite", "a-test")]
+    {
+        fs::create_dir(root.path().join(package)).unwrap();
+        fs::write(
+            root.path().join(package).join("package.json"),
+            serde_json::json!({"dependencies":{framework:"1.0"}, "scripts":{"test":command}})
+                .to_string(),
+        )
+        .unwrap();
+    }
+    for args in [
+        vec![
+            "context",
+            "entryPoint",
+            "--budget",
+            "2500",
+            "--expand-calls",
+            "1",
+        ],
+        vec!["context", "entryPoint", "--budget", "300"],
+        vec!["search", "auth", "--limit", "5", "--json"],
+    ] {
+        let mut expected: Option<Vec<u8>> = None;
+        for run in 0..12 {
+            if run == 6 {
+                fs::remove_dir_all(root.path().join(".scoutpack")).unwrap();
+            }
+            let output = Command::new(bin())
+                .args(&args)
+                .current_dir(root.path())
+                .output()
+                .unwrap();
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            if let Some(expected) = &expected {
+                assert_eq!(
+                    String::from_utf8_lossy(&output.stdout),
+                    String::from_utf8_lossy(expected),
+                    "replay {run}, {args:?}"
+                );
+            } else {
+                expected = Some(output.stdout);
+            }
+        }
+    }
+    fs::write(root.path().join(".gitignore"), ".scoutpack/\n").unwrap();
+    run_git(root.path(), &["init", "-b", "main"]);
+    run_git(
+        root.path(),
+        &["config", "user.email", "scoutpack@example.com"],
+    );
+    run_git(root.path(), &["config", "user.name", "ScoutPack Test"]);
+    run_git(root.path(), &["add", "."]);
+    run_git(root.path(), &["commit", "-m", "base"]);
+    run_git(root.path(), &["checkout", "-b", "feature"]);
+    fs::write(
+        root.path().join("entry.ts"),
+        "import { helper } from './helper0';\nexport function entryPoint() { return helper(); }\n",
+    )
+    .unwrap();
+    run_git(root.path(), &["add", "entry.ts"]);
+    run_git(root.path(), &["commit", "-m", "update entry"]);
+    let mut expected: Option<Vec<u8>> = None;
+    for _ in 0..6 {
+        let output = Command::new(bin())
+            .args(["context", "entryPoint", "--branch", "--budget", "2500"])
+            .current_dir(root.path())
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        if let Some(expected) = &expected {
+            assert_eq!(
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(expected)
+            );
+        } else {
+            expected = Some(output.stdout);
+        }
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn refresh_removes_indexed_source_replaced_by_external_symlink() {
+    use std::os::unix::fs::symlink;
+    let root = tempfile::tempdir().unwrap();
+    let outside = tempfile::tempdir().unwrap();
+    fs::write(
+        root.path().join("source.ts"),
+        "export function publicAuthMarker() { return true; }\n",
+    )
+    .unwrap();
+    let pack = Command::new(bin())
+        .args(["pack", "."])
+        .current_dir(root.path())
+        .output()
+        .unwrap();
+    assert!(pack.status.success());
+    fs::remove_file(root.path().join("source.ts")).unwrap();
+    fs::write(
+        outside.path().join("secret.ts"),
+        "export function externalSecretMarker() { return true; }\n",
+    )
+    .unwrap();
+    symlink(
+        outside.path().join("secret.ts"),
+        root.path().join("source.ts"),
+    )
+    .unwrap();
+    for query in ["externalSecretMarker", "publicAuthMarker"] {
+        let output = Command::new(bin())
+            .args(["search", query, "--json"])
+            .current_dir(root.path())
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert!(json["results"].as_array().unwrap().is_empty(), "{json}");
+    }
+}
+
+#[test]
 fn context_budget_bounds_complete_packets_and_rejects_tiny_requests() {
     let temp = tempfile::tempdir().unwrap();
     copy_dir(Path::new("tests/fixtures/nextjs-basic"), temp.path());

@@ -75,10 +75,16 @@ pub fn scan_repo_with_cache(
     let root = root
         .canonicalize()
         .with_context(|| format!("Could not resolve {}", root.display()))?;
+    anyhow::ensure!(
+        root.is_dir(),
+        "Repository path must be a directory: {}",
+        root.display()
+    );
     let mut builder = WalkBuilder::new(&root);
     builder
         .standard_filters(true)
         .hidden(false)
+        .follow_links(false)
         .add_custom_ignore_filename(".scoutpackignore");
 
     let mut result = ScanResult::default();
@@ -96,7 +102,7 @@ pub fn scan_repo_with_cache(
             }
         };
         let path = entry.path();
-        if path == root || path.is_dir() {
+        if path == root || entry.file_type().is_some_and(|kind| kind.is_dir()) {
             continue;
         }
 
@@ -132,7 +138,7 @@ pub fn scan_repo_with_cache(
             continue;
         }
 
-        let metadata = match fs::metadata(path) {
+        let metadata = match fs::symlink_metadata(path) {
             Ok(metadata) => metadata,
             Err(err) => {
                 result.skipped.push(SkippedFile {
@@ -142,6 +148,31 @@ pub fn scan_repo_with_cache(
                 continue;
             }
         };
+        if !metadata.file_type().is_file() {
+            result.skipped.push(SkippedFile {
+                path: rel_path,
+                reason: "not a regular file".to_owned(),
+            });
+            continue;
+        }
+        match path.canonicalize() {
+            Ok(resolved) if resolved.starts_with(&root) => {}
+            Ok(_) => {
+                result.skipped.push(SkippedFile {
+                    path: rel_path,
+                    reason: "outside repository root".to_owned(),
+                });
+                continue;
+            }
+            Err(err) => {
+                result.skipped.push(SkippedFile {
+                    path: rel_path,
+                    reason: err.to_string(),
+                });
+                continue;
+            }
+        }
+
         if metadata.len() > max_bytes {
             result.skipped.push(SkippedFile {
                 path: rel_path,
@@ -216,6 +247,10 @@ pub fn scan_repo_with_cache(
         });
     }
 
+    result.files.sort_by(|a, b| a.rel_path.cmp(&b.rel_path));
+    result
+        .skipped
+        .sort_by(|a, b| a.path.cmp(&b.path).then_with(|| a.reason.cmp(&b.reason)));
     Ok(result)
 }
 
@@ -501,6 +536,99 @@ mod tests {
             .skipped
             .iter()
             .all(|file| file.reason == "sensitive file pattern"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn symlinks_and_special_files_are_not_read() {
+        use std::os::unix::{fs::symlink, net::UnixListener};
+        let root = tempfile::tempdir().unwrap();
+        let outside = tempfile::tempdir().unwrap();
+        fs::write(
+            outside.path().join("secrets.ts"),
+            "export const leaked = 'secret';",
+        )
+        .unwrap();
+        fs::write(root.path().join("safe.ts"), "export const safe = true;").unwrap();
+        symlink(
+            outside.path().join("secrets.ts"),
+            root.path().join("external.ts"),
+        )
+        .unwrap();
+        symlink(root.path().join("safe.ts"), root.path().join("internal.ts")).unwrap();
+        symlink(outside.path(), root.path().join("linked-dir")).unwrap();
+        symlink(
+            outside.path().join("missing"),
+            root.path().join("broken.ts"),
+        )
+        .unwrap();
+        let _socket = UnixListener::bind(root.path().join("socket.ts")).unwrap();
+        let result = scan_repo(root.path(), &ScoutpackConfig::default()).unwrap();
+        assert_eq!(
+            result
+                .files
+                .iter()
+                .map(|file| file.rel_path.as_str())
+                .collect::<Vec<_>>(),
+            vec!["safe.ts"]
+        );
+        assert_eq!(result.files_read, 1);
+        for name in ["external.ts", "internal.ts", "broken.ts", "socket.ts"] {
+            assert!(
+                result
+                    .skipped
+                    .iter()
+                    .any(|file| file.path == name && file.reason == "not a regular file"),
+                "{name}"
+            );
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn canonical_root_and_cached_symlink_replacement() {
+        use std::os::unix::fs::symlink;
+        let parent = tempfile::tempdir().unwrap();
+        let root = parent.path().join("repo");
+        fs::create_dir(&root).unwrap();
+        fs::write(root.join("source.ts"), "export const value = true;").unwrap();
+        symlink(&root, parent.path().join("alias")).unwrap();
+        let config = ScoutpackConfig::default();
+        let initial = scan_repo(&parent.path().join("alias"), &config).unwrap();
+        assert_eq!(initial.files[0].rel_path, "source.ts");
+        let file = &initial.files[0];
+        let cache = HashMap::from([(
+            file.rel_path.clone(),
+            CachedFileMetadata {
+                language: file.language.clone(),
+                kind: file.kind.clone(),
+                size_bytes: file.size_bytes,
+                hash: file.hash.clone(),
+                mtime_ns: file.mtime_ns,
+            },
+        )]);
+        fs::write(
+            parent.path().join("outside.ts"),
+            "export const secret = true;",
+        )
+        .unwrap();
+        fs::remove_file(root.join("source.ts")).unwrap();
+        symlink(parent.path().join("outside.ts"), root.join("source.ts")).unwrap();
+        let result = scan_repo_with_cache(&root, &config, &cache).unwrap();
+        assert!(result.files.is_empty());
+        assert_eq!(result.files_read, 0);
+        assert_eq!(result.metadata_reused, 0);
+    }
+
+    #[test]
+    fn scan_requires_directory_root() {
+        let root = tempfile::tempdir().unwrap();
+        let file = root.path().join("source.ts");
+        fs::write(&file, "export const value = true;").unwrap();
+        assert!(scan_repo(&file, &ScoutpackConfig::default())
+            .unwrap_err()
+            .to_string()
+            .contains("must be a directory"));
     }
 
     #[test]

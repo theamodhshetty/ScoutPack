@@ -374,14 +374,7 @@ fn merge_results(results: &mut Vec<search::SearchResult>, extra: Vec<search::Sea
         }
         results.push(result);
     }
-    results.sort_by(|a, b| {
-        b.score
-            .partial_cmp(&a.score)
-            .unwrap_or(std::cmp::Ordering::Equal)
-            .then_with(|| a.path.cmp(&b.path))
-            .then_with(|| a.start_line.cmp(&b.start_line))
-            .then_with(|| a.end_line.cmp(&b.end_line))
-    });
+    results.sort_by(search::compare_results);
 }
 
 fn relevant_files(results: &[search::SearchResult]) -> Vec<(String, String)> {

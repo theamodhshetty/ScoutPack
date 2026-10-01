@@ -56,6 +56,9 @@ All notable ScoutPack changes are tracked here.
 
 ### Fixed
 
+- Source scanner no longer follows file symlinks into external content or reuses cached entries for non-regular files. Refresh removes source content replaced by symlinks.
+- Default keyword retrieval and packets now use stable tie-breakers before candidate limits and ranked truncation, with ordered import reasons, call edges, commands, framework samples, and scan records.
+
 - Enforced the estimator budget across the complete context packet, including fallback metadata, commands, and hints. Too-small budgets fail clearly instead of returning oversized packets; JSON/XML wrappers and template framing remain outside the packet budget.
 
 ## v0.1.0 - 2026-05-12
