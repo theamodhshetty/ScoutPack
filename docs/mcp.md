@@ -107,6 +107,8 @@ Security notes:
 - Tool responses include structured JSON plus text content for broad client compatibility.
 - `template` supports built-in templates such as `bugfix`, `refactor`, `review`, `docs`, and `test`.
 - `recent_changes` uses local git metadata only and returns file summaries with line counts, not full diff bodies.
+- `recent_changes` includes `base_commit` and `head_commit` resolved commit IDs. Branch mode compares the merge base with HEAD; explicit diff mode compares the two supplied endpoints.
+- Context budgets cover the complete Markdown packet under ScoutPack's estimator, excluding MCP/JSON/XML transport framing. Too-small requests return an error; bounded fallback packets disclose omitted content.
 - HTTP/SSE mode uses the same tool schemas and does not add write, shell, telemetry, or network-fetch behavior.
 
 ## Client Docs

@@ -350,7 +350,7 @@ fn language_enabled(language: &str, config: &ScoutpackConfig) -> bool {
     }
 }
 
-fn is_default_ignored(rel: &Path) -> bool {
+pub(crate) fn is_default_ignored(rel: &Path) -> bool {
     rel.components().any(|component| match component {
         Component::Normal(part) => {
             let part = part.to_string_lossy();
@@ -362,7 +362,7 @@ fn is_default_ignored(rel: &Path) -> bool {
     })
 }
 
-fn is_sensitive_path(rel: &Path) -> bool {
+pub(crate) fn is_sensitive_path(rel: &Path) -> bool {
     let file_name = rel.file_name().and_then(|name| name.to_str()).unwrap_or("");
     if file_name == ".env"
         || file_name.starts_with(".env.")

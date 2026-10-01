@@ -36,6 +36,10 @@ All notable ScoutPack changes are tracked here.
 
 ### Changed
 
+- Git-scoped context now reads a temporary index of the resolved content commit, includes full base/content commit IDs, and excludes staged, unstaged, and untracked content. Branch mode uses the merge base with main; explicit diff keeps two-endpoint semantics. Git-scoped semantic search reports an actionable unsupported-combination error.
+
+- Reordered active roadmap and milestones around whole-packet budget correctness, review evidence, verified installation, and measured external use; retained previous milestone planning as superseded history.
+
 - Incremental indexing now avoids reading and hashing metadata-unchanged files and updates only affected FTS rows instead of rebuilding the entire FTS table.
 - Benchmark scripts now isolate retrieval/render latency with `--no-refresh` and parse chunk counts independently from embedding counts.
 - Benchmark reports now separate packet compression from retrieval quality and include host/toolchain metadata.
@@ -43,6 +47,10 @@ All notable ScoutPack changes are tracked here.
 - Task query normalization removes generic edit verbs and maps common coding nouns such as `registration` to symbol forms such as `register`.
 - Context snippet admission now honors requested token budget instead of allowing 10% overhead.
 - Renamed context packet `Risks` section to `Risk Hints` and added confidence labels to avoid implying static-analysis proof.
+
+### Fixed
+
+- Enforced the estimator budget across the complete context packet, including fallback metadata, commands, and hints. Too-small budgets fail clearly instead of returning oversized packets; JSON/XML wrappers and template framing remain outside the packet budget.
 
 ## v0.1.0 - 2026-05-12
 

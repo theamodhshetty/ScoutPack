@@ -40,7 +40,7 @@ AI coding agents are powerful, but they still burn time and tokens when they sta
 | Agent scans broad folders. | Agent starts with ranked files and symbols. |
 | Repo conventions get missed. | Package scripts and framework signals are included. |
 | Secret files are risky. | Sensitive patterns are skipped by default. |
-| Context grows into noise. | Packets stay under a token budget. |
+| Context grows into noise. | Successful packets fit ScoutPack's estimated token budget. |
 | Debugging starts from guesses. | Risk hints point to source-backed inspection areas. |
 
 ScoutPack answers one practical question before edits start:
@@ -52,6 +52,10 @@ What should this AI agent read first for this task?
 Think of ScoutPack as a local context preflight check: run it before asking an agent to edit code, review a PR, debug a failing flow, or audit a risky path.
 
 ScoutPack is most useful when you need reproducible, inspectable context across tools. Native agent search may be enough for small repos or one-off tasks. See [WHY.md](WHY.md) for where ScoutPack helps and where it does not.
+
+`--budget` bounds the complete Markdown packet using ScoutPack's heuristic estimator, not a provider tokenizer. JSON/XML envelopes and template framing are outside that budget. Requests too small to preserve task and source metadata fail with an actionable minimum; oversized sections are omitted explicitly.
+
+For committed PR review, run `scoutpack context "review my PR" --branch --budget 3000` from the repository root. Git-scoped packets read a temporary index of the resolved content commit and include full commit IDs; staged, unstaged, and untracked changes are excluded. `--branch` uses the merge base with main. See [Git-aware context](examples/git-aware-context.md) for scope and limitations.
 
 ## One-Minute Flow
 
