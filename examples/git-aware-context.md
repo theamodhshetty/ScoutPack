@@ -18,6 +18,10 @@ Run Git-scoped context from the repository root. `--branch` selects changes betw
 
 All snippets, symbols, imports, call expansion, and project commands come from the resolved content commit, not the current working-tree index. Full base/content commit IDs appear in `Source Revision`. Staged, unstaged, and untracked edits are excluded, even when the requested head is historical or a file was later deleted. Git summaries can mention deleted or skipped paths, but no content from those paths bypasses scanner policy.
 
+Renames are detected by content similarity (50% threshold), independently of the local `diff.renames` setting. A detected move counts as one changed file and is shown as `` `old/path.ts` -> `new/path.ts`: renamed ``. Added/deleted line counts describe edits within the moved file, rather than treating its entire contents as deleted and added. Unrelated additions and deletions remain separate changes. This is similarity-based detection, not a record of which Git command created the commit.
+
+The MCP `recent_changes` result keeps `path` as the destination for a rename and adds `previous_path` with its original location. Other change records omit `previous_path`. Git-scoped packets select snippets from the destination at the requested content commit; deleted paths appear only in the change summary.
+
 ScoutPack builds and deletes a temporary index for each Git-scoped packet. It skips symlinks, submodules, sensitive patterns, oversized blobs, and unsupported files; it honors committed ignore rules plus current root ignore policy. Current root size limits also bound snapshot materialization. Policy/config changes can affect selection, so commit identity does not by itself guarantee byte-for-byte packet reproducibility. Snapshot rebuilding adds latency on larger repositories.
 
 `--no-refresh` does not disable snapshot construction. `--semantic` is rejected with Git scope because the temporary index has no embeddings; omit it rather than use working-tree vectors against a different revision.

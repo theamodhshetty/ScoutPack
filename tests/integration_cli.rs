@@ -415,6 +415,104 @@ fn git_packets_use_pinned_content_and_branch_merge_base() {
 }
 
 #[test]
+fn git_packets_follow_renames_at_the_requested_revision() {
+    let temp = tempfile::tempdir().unwrap();
+    run_git(temp.path(), &["init", "-b", "main"]);
+    run_git(
+        temp.path(),
+        &["config", "user.email", "scoutpack@example.com"],
+    );
+    run_git(temp.path(), &["config", "user.name", "ScoutPack Test"]);
+    fs::write(
+        temp.path().join("before.ts"),
+        "export function login() { return 'PINNED_RENAME'; }\n",
+    )
+    .unwrap();
+    fs::write(
+        temp.path().join("removed.ts"),
+        "export const retired = 'DELETED_CONTENT';\n",
+    )
+    .unwrap();
+    run_git(temp.path(), &["add", "."]);
+    run_git(temp.path(), &["commit", "-m", "base"]);
+    run_git(temp.path(), &["checkout", "-b", "feature"]);
+    run_git(temp.path(), &["mv", "before.ts", "after.ts"]);
+    run_git(temp.path(), &["rm", "removed.ts"]);
+    run_git(
+        temp.path(),
+        &["commit", "-m", "move login and remove retired code"],
+    );
+    run_git(temp.path(), &["tag", "review-head"]);
+    // The review revision remains available even after HEAD deletes the destination.
+    run_git(temp.path(), &["rm", "after.ts"]);
+    run_git(temp.path(), &["commit", "-m", "delete after review"]);
+    fs::write(
+        temp.path().join("after.ts"),
+        "export const login = 'UNTRACKED_REPLACEMENT';\n",
+    )
+    .unwrap();
+
+    for args in [
+        vec![
+            "context",
+            "review login",
+            "--diff",
+            "main..review-head",
+            "--budget",
+            "3000",
+        ],
+        vec![
+            "context",
+            "review login",
+            "--diff",
+            "main..review-head",
+            "--budget",
+            "600",
+        ],
+        vec![
+            "template",
+            "review",
+            "review login",
+            "--diff",
+            "main..review-head",
+            "--budget",
+            "3000",
+        ],
+    ] {
+        let output = Command::new(bin())
+            .args(&args)
+            .current_dir(temp.path())
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{args:?}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let packet = String::from_utf8(output.stdout).unwrap();
+        assert!(
+            packet.contains("Summary: 2 files changed, +0 -1"),
+            "{packet}"
+        );
+        assert!(
+            packet.contains("`before.ts` -> `after.ts`: renamed, +0 -0"),
+            "{packet}"
+        );
+        assert!(packet.contains("`removed.ts`: deleted, +0 -1"), "{packet}");
+        assert!(!packet.contains("UNTRACKED_REPLACEMENT"), "{packet}");
+        assert!(!packet.contains("DELETED_CONTENT"), "{packet}");
+        assert!(!packet.contains("```file:before.ts"), "{packet}");
+        if args.last() == Some(&"3000") {
+            assert!(packet.contains("```file:after.ts"), "{packet}");
+            assert!(packet.contains("PINNED_RENAME"), "{packet}");
+        }
+        if args[0] == "context" {
+            assert!(!temp.path().join(".scoutpack").exists());
+        }
+    }
+}
+
+#[test]
 fn init_pack_search_context_stats_work() {
     let temp = tempfile::tempdir().unwrap();
     copy_dir(Path::new("tests/fixtures/nextjs-basic"), temp.path());

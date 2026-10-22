@@ -56,6 +56,8 @@ All notable ScoutPack changes are tracked here.
 
 ### Fixed
 
+- Git review summaries detect renames before computing file and line counts. Context packets and review templates show both paths; MCP change records include `previous_path` for detected renames. Snippets still come from the destination at the requested commit.
+
 - Source scanner no longer follows file symlinks into external content or reuses cached entries for non-regular files. Refresh removes source content replaced by symlinks.
 - Default keyword retrieval and packets now use stable tie-breakers before candidate limits and ranked truncation, with ordered import reasons, call edges, commands, framework samples, and scan records.
 
