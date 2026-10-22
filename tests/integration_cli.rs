@@ -1634,3 +1634,124 @@ fn python_and_go_config_fixtures_emit_commands_and_frameworks() {
     assert!(go_out.contains("go test ./..."), "{go_out}");
     assert!(go_out.contains("go build ./..."), "{go_out}");
 }
+
+#[test]
+fn git_templates_leave_the_working_tree_index_untouched() {
+    let temp = tempfile::tempdir().unwrap();
+    run_git(temp.path(), &["init", "-b", "main"]);
+    run_git(
+        temp.path(),
+        &["config", "user.email", "scoutpack@example.com"],
+    );
+    run_git(temp.path(), &["config", "user.name", "ScoutPack Test"]);
+    fs::write(
+        temp.path().join("auth.ts"),
+        "export function login() { return 'BASE'; }\n",
+    )
+    .unwrap();
+    run_git(temp.path(), &["add", "."]);
+    run_git(temp.path(), &["commit", "-m", "base"]);
+    run_git(temp.path(), &["checkout", "-b", "feature"]);
+    fs::write(
+        temp.path().join("auth.ts"),
+        "export function login() { return 'COMMITTED_LOGIN'; }\n",
+    )
+    .unwrap();
+    run_git(temp.path(), &["add", "."]);
+    run_git(temp.path(), &["commit", "-m", "change login"]);
+    fs::write(
+        temp.path().join("auth.ts"),
+        "export function login() { return 'DIRTY_LOGIN'; }\n",
+    )
+    .unwrap();
+
+    for scope in [
+        vec!["--since", "main"],
+        vec!["--diff", "main..HEAD"],
+        vec!["--branch"],
+    ] {
+        for no_refresh in [false, true] {
+            let mut command = Command::new(bin());
+            command
+                .args(["template", "review", "review login", "--budget", "3000"])
+                .args(&scope)
+                .current_dir(temp.path());
+            if no_refresh {
+                command.arg("--no-refresh");
+            }
+            let output = command.output().unwrap();
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            let prompt = String::from_utf8(output.stdout).unwrap();
+            assert!(prompt.contains("COMMITTED_LOGIN"), "{prompt}");
+            assert!(!prompt.contains("DIRTY_LOGIN"), "{prompt}");
+            assert!(
+                !temp.path().join(".scoutpack").exists(),
+                "Git template refreshed the working tree: {scope:?}"
+            );
+        }
+    }
+
+    // Ordinary templates still build an index and use current working-tree content.
+    let output = Command::new(bin())
+        .args(["template", "review", "review login"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(String::from_utf8_lossy(&output.stdout).contains("DIRTY_LOGIN"));
+    let database = temp.path().join(".scoutpack/pack.sqlite");
+    let before = fs::read(&database).unwrap();
+    fs::write(
+        temp.path().join("auth.ts"),
+        "export function login() { return 'SECOND_DIRTY_LOGIN'; }\n",
+    )
+    .unwrap();
+    let output = Command::new(bin())
+        .args(["template", "review", "review login", "--branch"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(
+        fs::read(&database).unwrap(),
+        before,
+        "Git template modified an existing index"
+    );
+}
+
+#[test]
+fn invalid_git_template_scopes_fail_before_refreshing() {
+    for scope in [
+        vec!["--branch", "--since", "main"],
+        vec!["--diff", "missing-range-separator"],
+    ] {
+        let temp = tempfile::tempdir().unwrap();
+        // Validation must win over refresh/config errors, as it does for `context`.
+        fs::write(temp.path().join("scoutpack.toml"), "invalid = [").unwrap();
+        let output = Command::new(bin())
+            .args(["template", "review", "review login"])
+            .args(&scope)
+            .current_dir(temp.path())
+            .output()
+            .unwrap();
+        assert!(!output.status.success());
+        let error = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            error.contains("Use only one") || error.contains("--diff` must use"),
+            "{error}"
+        );
+        assert!(!temp.path().join(".scoutpack").exists());
+    }
+}
