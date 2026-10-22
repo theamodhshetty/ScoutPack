@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use git2::{Delta, DiffOptions, Patch, Repository, StatusOptions, Tree};
+use git2::{Delta, DiffFindOptions, DiffOptions, Patch, Repository, StatusOptions, Tree};
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 
@@ -13,9 +13,24 @@ pub enum GitContextMode {
 #[derive(Debug, Clone, Serialize)]
 pub struct GitChange {
     pub path: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub previous_path: Option<String>,
     pub status: String,
     pub additions: usize,
     pub deletions: usize,
+}
+
+impl GitChange {
+    pub fn summary_line(&self) -> String {
+        let path = match &self.previous_path {
+            Some(previous) => format!("`{previous}` -> `{}`", self.path),
+            None => format!("`{}`", self.path),
+        };
+        format!(
+            "- {path}: {}, +{} -{}\n",
+            self.status, self.additions, self.deletions
+        )
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -118,7 +133,13 @@ fn diff_range(repo: &Repository, base: &str, head: &str) -> Result<RecentChanges
     let base_tree = base_commit.tree()?;
     let head_tree = head_commit.tree()?;
     let mut options = DiffOptions::new();
-    let diff = repo.diff_tree_to_tree(Some(&base_tree), Some(&head_tree), Some(&mut options))?;
+    let mut diff =
+        repo.diff_tree_to_tree(Some(&base_tree), Some(&head_tree), Some(&mut options))?;
+    // Tree diffs start with additions/deletions. Resolve moves before counting
+    // files or creating patches, using the same policy regardless of Git config.
+    diff.find_similar(Some(
+        DiffFindOptions::new().renames(true).rename_threshold(50),
+    ))?;
     let stats = diff.stats()?;
     let mut changes = Vec::new();
 
@@ -140,6 +161,9 @@ fn diff_range(repo: &Repository, base: &str, head: &str) -> Result<RecentChanges
             .unwrap_or((0, 0));
         changes.push(GitChange {
             path,
+            previous_path: (delta.status() == Delta::Renamed)
+                .then(|| delta.old_file().path().map(normalize_path))
+                .flatten(),
             status: delta_status(delta.status()).to_owned(),
             additions,
             deletions,
@@ -289,4 +313,122 @@ fn relativize_to_root(
 fn normalize_path(path: impl AsRef<Path>) -> String {
     let path: PathBuf = path.as_ref().components().collect();
     path.to_string_lossy().replace('\\', "/")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    fn commit_all(repo: &Repository) -> String {
+        let mut index = repo.index().unwrap();
+        index
+            .add_all(["."], git2::IndexAddOption::DEFAULT, None)
+            .unwrap();
+        index.update_all(["."], None).unwrap();
+        index.write().unwrap();
+        let tree = repo.find_tree(index.write_tree().unwrap()).unwrap();
+        let signature = git2::Signature::now("ScoutPack Test", "test@example.com").unwrap();
+        let parent = repo.head().ok().map(|head| head.peel_to_commit().unwrap());
+        let parents: Vec<_> = parent.iter().collect();
+        repo.commit(
+            Some("HEAD"),
+            &signature,
+            &signature,
+            "fixture",
+            &tree,
+            &parents,
+        )
+        .unwrap()
+        .to_string()
+    }
+
+    #[test]
+    fn rename_summary_counts_a_move_once_and_keeps_real_deletions() {
+        let temp = tempfile::tempdir().unwrap();
+        let repo = Repository::init(temp.path()).unwrap();
+        // Results should not depend on the user's diff.renames setting.
+        repo.config()
+            .unwrap()
+            .set_bool("diff.renames", false)
+            .unwrap();
+        fs::write(
+            temp.path().join("before.ts"),
+            "export const login = true;\n",
+        )
+        .unwrap();
+        fs::write(
+            temp.path().join("removed.ts"),
+            "export const obsolete = 42;\n",
+        )
+        .unwrap();
+        let base = commit_all(&repo);
+        fs::rename(temp.path().join("before.ts"), temp.path().join("after.ts")).unwrap();
+        fs::remove_file(temp.path().join("removed.ts")).unwrap();
+        let head = commit_all(&repo);
+
+        let summary = diff_range(&repo, &base, &head).unwrap();
+        assert_eq!(summary.files_changed, 2);
+        assert_eq!((summary.insertions, summary.deletions), (0, 1));
+        assert_eq!(summary.changes.len(), 2);
+        let moved = &summary.changes[0];
+        assert_eq!(moved.path, "after.ts");
+        assert_eq!(moved.status, "renamed");
+        assert_eq!((moved.additions, moved.deletions), (0, 0));
+        let json = serde_json::to_value(moved).unwrap();
+        assert_eq!(json["previous_path"], "before.ts");
+        let deleted = &summary.changes[1];
+        assert_eq!(deleted.path, "removed.ts");
+        assert_eq!(deleted.status, "deleted");
+        assert!(serde_json::to_value(deleted)
+            .unwrap()
+            .get("previous_path")
+            .is_none());
+    }
+
+    #[test]
+    fn rename_with_edits_keeps_line_counts_and_does_not_pair_unrelated_files() {
+        let temp = tempfile::tempdir().unwrap();
+        let repo = Repository::init(temp.path()).unwrap();
+        let source = (0..30)
+            .map(|n| format!("export const login{n} = {n};\n"))
+            .collect::<String>();
+        fs::write(temp.path().join("old.ts"), &source).unwrap();
+        fs::write(temp.path().join("removed.md"), "obsolete documentation\n").unwrap();
+        let base = commit_all(&repo);
+        fs::remove_file(temp.path().join("old.ts")).unwrap();
+        fs::write(
+            temp.path().join("new.ts"),
+            source.replace("login0 = 0", "login0 = 99"),
+        )
+        .unwrap();
+        fs::remove_file(temp.path().join("removed.md")).unwrap();
+        fs::write(
+            temp.path().join("added.py"),
+            "print('unrelated addition')\n",
+        )
+        .unwrap();
+        let head = commit_all(&repo);
+        let summary = diff_range(&repo, &base, &head).unwrap();
+        assert_eq!(summary.files_changed, 3);
+        assert_eq!((summary.insertions, summary.deletions), (2, 2));
+        assert_eq!(
+            summary
+                .changes
+                .iter()
+                .map(|c| (c.path.as_str(), c.status.as_str()))
+                .collect::<Vec<_>>(),
+            [
+                ("added.py", "added"),
+                ("new.ts", "renamed"),
+                ("removed.md", "deleted")
+            ]
+        );
+        let moved = &summary.changes[1];
+        assert_eq!((moved.additions, moved.deletions), (1, 1));
+        assert_eq!(
+            serde_json::to_value(moved).unwrap()["previous_path"],
+            "old.ts"
+        );
+    }
 }

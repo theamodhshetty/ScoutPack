@@ -114,10 +114,7 @@ pub fn build_context_packet_with_options(
             prefix.push_str("- No changed files in range\n");
         } else {
             for change in recent_changes.changes.iter().take(20) {
-                prefix.push_str(&format!(
-                    "- `{}`: {}, +{} -{}\n",
-                    change.path, change.status, change.additions, change.deletions
-                ));
+                prefix.push_str(&change.summary_line());
             }
         }
     }
@@ -180,12 +177,7 @@ pub fn build_context_packet_with_options(
                 "- Summary: {} files changed, +{} -{}\n",
                 recent.files_changed, recent.insertions, recent.deletions
             ));
-            changes.extend(recent.changes.iter().map(|change| {
-                format!(
-                    "- `{}`: {}, +{} -{}\n",
-                    change.path, change.status, change.additions, change.deletions
-                )
-            }));
+            changes.extend(recent.changes.iter().map(git::GitChange::summary_line));
         }
         let sections = vec![
             (

@@ -174,10 +174,7 @@ fn render_recent_changes(root: &Path, mode: Option<&git::GitContextMode>) -> Res
         changes.files_changed, changes.insertions, changes.deletions
     ));
     for change in changes.changes.iter().take(20) {
-        out.push_str(&format!(
-            "- `{}`: {}, +{} -{}\n",
-            change.path, change.status, change.additions, change.deletions
-        ));
+        out.push_str(&change.summary_line());
     }
     Ok(out)
 }
