@@ -16,7 +16,8 @@ scoutpack mcp . --http --port 7777
 
 ## Client Config
 
-Most MCP clients use one of two local stdio config shapes.
+Codex uses TOML configuration; see the [Codex setup and live smoke check](ai-agent-workflows.md#codex).
+Other MCP clients commonly use one of the two JSON stdio config shapes below.
 
 Use an absolute project path in client configs to avoid depending on their working directory. Use the full ScoutPack executable path too if the client does not inherit your shell PATH.
 
@@ -134,4 +135,4 @@ The response retains `task`, `budget`, `estimated_tokens`, and `packet`; commit 
 
 - [Claude Code MCP](https://code.claude.com/docs/en/mcp)
 - [VS Code MCP configuration](https://code.visualstudio.com/docs/copilot/reference/mcp-configuration)
-- [OpenAI Codex MCP overview](https://developers.openai.com/learn/docs-mcp)
+- [OpenAI Codex MCP configuration](https://learn.chatgpt.com/docs/extend/mcp)

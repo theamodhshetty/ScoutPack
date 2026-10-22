@@ -6,6 +6,8 @@ All notable ScoutPack changes are tracked here.
 
 ### Added
 
+- Opt-in Codex CLI/MCP smoke runner with a generated committed/dirty fixture, verified tool results, local evidence output, and offline transcript checks in CI. Documented Codex TOML setup and narrow per-tool approval for the isolated run.
+
 - MCP `context` Git scopes (`since`, `diff`, `branch`) for commit-pinned review packets, with schema discovery and dirty-tree regression coverage.
 
 - `scoutpack doctor` health and freshness diagnostics with text, JSON, and `--fix` modes.
