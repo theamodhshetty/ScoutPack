@@ -10,7 +10,7 @@ usage() {
 Install ScoutPack from GitHub Releases.
 
 Usage:
-  install.sh [--version v0.1.0] [--dir /usr/local/bin]
+  install.sh [--version v0.1.1] [--dir /usr/local/bin]
 
 Environment:
   SCOUTPACK_VERSION       Release tag. Default: latest
@@ -102,6 +102,15 @@ main() {
   need_cmd uname
   need_cmd tar
   need_cmd mktemp
+  need_cmd awk
+  if command -v sha256sum >/dev/null 2>&1; then
+    hash_tool=sha256sum
+  elif command -v shasum >/dev/null 2>&1; then
+    hash_tool=shasum
+  else
+    echo "required command not found: sha256sum or shasum" >&2
+    exit 1
+  fi
 
   target="$(detect_target)"
   archive="scoutpack-${target}.tar.gz"
@@ -117,15 +126,38 @@ main() {
   fi
 
   tmp_dir="$(mktemp -d)"
-  trap 'rm -rf "$tmp_dir"' EXIT INT HUP
+  trap 'rm -rf "$tmp_dir"; rm -f "${install_tmp:-}"' EXIT INT HUP
 
   echo "Downloading $url"
   download "$url" "$tmp_dir/$archive"
 
+  download "$url.sha256" "$tmp_dir/$archive.sha256"
+  expected="$(awk -v archive="$archive" '
+    NF == 2 && $2 == archive && length($1) == 64 && $1 !~ /[^[:xdigit:]]/ { hash=$1; valid++ }
+    END { if (NR != 1 || valid != 1) exit 1; print tolower(hash) }
+  ' "$tmp_dir/$archive.sha256")" || {
+    echo "invalid checksum file for $archive" >&2
+    exit 1
+  }
+  if [ "$hash_tool" = sha256sum ]; then
+    actual="$(sha256sum "$tmp_dir/$archive" | awk '{print $1}')"
+  else
+    actual="$(shasum -a 256 "$tmp_dir/$archive" | awk '{print $1}')"
+  fi
+  if [ "$actual" != "$expected" ]; then
+    echo "checksum mismatch for $archive; installation stopped" >&2
+    exit 1
+  fi
+
   tar -xzf "$tmp_dir/$archive" -C "$tmp_dir"
   mkdir -p "$INSTALL_DIR"
-  cp "$tmp_dir/scoutpack-${target}/scoutpack" "$INSTALL_DIR/scoutpack"
-  chmod 755 "$INSTALL_DIR/scoutpack"
+  # Validate the executable before replacing an existing installation.
+  chmod 755 "$tmp_dir/scoutpack-${target}/scoutpack"
+  "$tmp_dir/scoutpack-${target}/scoutpack" --version
+  install_tmp="$(mktemp "$INSTALL_DIR/.scoutpack.XXXXXX")"
+  cp "$tmp_dir/scoutpack-${target}/scoutpack" "$install_tmp"
+  chmod 755 "$install_tmp"
+  mv -f "$install_tmp" "$INSTALL_DIR/scoutpack"
 
   echo "Installed ScoutPack to $INSTALL_DIR/scoutpack"
   "$INSTALL_DIR/scoutpack" --version
