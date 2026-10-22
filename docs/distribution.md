@@ -1,6 +1,6 @@
 # Distribution
 
-ScoutPack supports source installs. Release candidates must pass the artifact gates below before binary installation is advertised.
+ScoutPack v0.1.1 provides verified default-feature release archives as well as source installation. Native archive checks and a macOS arm64 Unix-installer check are recorded in the [release notes](https://github.com/theamodhshetty/ScoutPack/releases/tag/v0.1.1). Follow the artifact gates below for subsequent releases.
 
 ## Install Targets
 
@@ -8,7 +8,7 @@ ScoutPack supports source installs. Release candidates must pass the artifact ga
 | --- | --- | --- |
 | GitHub source install | supported | `cargo install --git https://github.com/theamodhshetty/ScoutPack.git` |
 | Local checkout install | supported | `cargo install --path .` |
-| GitHub release binaries | prepared | `curl -fsSL https://raw.githubusercontent.com/theamodhshetty/ScoutPack/main/install.sh \| sh` |
+| GitHub release binaries | v0.1.1 published | `curl -fsSL https://raw.githubusercontent.com/theamodhshetty/ScoutPack/main/install.sh \| sh` |
 | Homebrew tap | prepared | `brew install theamodhshetty/scoutpack/scoutpack` |
 | Scoop bucket | prepared | `scoop install scoutpack` |
 | crates.io | planned | `cargo install scoutpack` |

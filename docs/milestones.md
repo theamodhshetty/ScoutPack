@@ -35,11 +35,12 @@ Exit: reviewers can identify exactly which content packets contain and why. Unch
 
 ### M14: Installation And Pilot Workflow
 
-Status: planned; depends on correctness gates.
+Status: in progress. Default-feature v0.1.1 distribution is verified within the platform limits below; client/pilot and remaining correctness gates stay open.
 
-- [ ] Recheck public release metadata and publish actual verified artifacts through release workflow.
-- [ ] Verify checksums and clean installation on claimed supported platforms.
-- [ ] Validate doctor and one review flow from installed executable.
+- [x] Publish actual default-feature v0.1.1 artifacts and SHA-256 sidecars after native release-workflow verification.
+- [x] Verify checksums and extracted executables on five native CI targets; verify the published Unix installer on macOS arm64. See [installation](installation.md) for exact runner/platform limits.
+- [ ] Observe Unix-installer use on Linux/Intel macOS and manual Windows installation outside CI.
+- [x] Validate pack, context retrieval and doctor from extracted binaries; verify committed Git review from the installed macOS arm64 release.
 - [x] Test one Codex CLI workflow: opt-in synthetic Git/MCP check with successful tool events and committed/dirty provenance validation. Observed October 22, 2026; versions and limits in [AI agent workflows](ai-agent-workflows.md#repeatable-codex-cli-smoke-check).
 - [ ] Test one Claude Code workflow.
 - [ ] Recruit five consenting external reviewers and observe installation failures.

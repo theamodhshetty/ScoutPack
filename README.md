@@ -32,7 +32,7 @@ scoutpack context "fix login redirect loop" --budget 2500
 
 Paste the packet into your agent alongside the task. Review it before sharing private code with an external provider. Ordinary queries create and refresh the local index automatically; `init` and a manual `pack` are optional.
 
-**Trying from a checkout?** Use `cargo install --path . --locked`. The published `v0.1.0` release has an older feature set. Binary installer, Homebrew, and Scoop scaffolding exist, but require published artifacts and checksums; Cargo source installation is the documented path today. [Installation and updates](docs/installation.md).
+**Prefer a binary?** [v0.1.1](https://github.com/theamodhshetty/ScoutPack/releases/tag/v0.1.1) includes default-feature archives and SHA-256 sidecars for macOS, Linux and Windows. The Unix installer verifies checksums before installation. Homebrew and Scoop remain unverified templates. **Trying from a checkout?** Use `cargo install --path . --locked`. [Installation, platform checks and updates](docs/installation.md).
 
 ## Choose A Workflow
 
