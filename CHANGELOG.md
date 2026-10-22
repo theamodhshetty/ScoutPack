@@ -4,7 +4,11 @@ All notable ScoutPack changes are tracked here.
 
 ## Unreleased
 
+## v0.1.1 - 2026-10-23
+
 ### Added
+
+- Native release archive smoke checks for five platforms, SHA-256 sidecars, tag/version checks and draft-only release creation. The Unix installer verifies checksums and the executable before replacing an existing installation.
 
 - Opt-in Codex CLI/MCP smoke runner with a generated committed/dirty fixture, verified tool results, local evidence output, and offline transcript checks in CI. Documented Codex TOML setup and narrow per-tool approval for the isolated run.
 
