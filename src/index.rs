@@ -422,6 +422,61 @@ pub fn read_indexed_commands(conn: &Connection) -> Result<Vec<IndexedCommand>> {
         .collect())
 }
 
+/// Ancestor configuration directories for selected or Git-affected file paths.
+/// This is directory-based guidance, not workspace or dependency-graph resolution.
+pub struct GuidanceScope {
+    directories: HashSet<PathBuf>,
+}
+
+impl GuidanceScope {
+    pub fn for_paths(paths: &[String]) -> Self {
+        Self {
+            directories: paths
+                .iter()
+                .filter_map(|path| Path::new(path).parent())
+                .flat_map(Path::ancestors)
+                .map(Path::to_path_buf)
+                .collect(),
+        }
+    }
+
+    fn includes(&self, source: &str) -> bool {
+        Path::new(source)
+            .parent()
+            .is_some_and(|directory| self.directories.contains(directory))
+    }
+}
+
+pub fn read_scoped_commands(
+    conn: &Connection,
+    scope: &GuidanceScope,
+) -> Result<Vec<(String, String, String)>> {
+    // Keep sources distinct until after filtering: MIN(source) can otherwise
+    // discard an affected package's copy of an identical command.
+    let mut stmt = conn.prepare(
+        "SELECT DISTINCT name, command, source FROM commands
+         ORDER BY CASE name
+           WHEN 'test' THEN 0 WHEN 'lint' THEN 1
+           WHEN 'typecheck' THEN 2 WHEN 'build' THEN 3 ELSE 4
+         END, name, command, source",
+    )?;
+    let rows = stmt.query_map([], |row| {
+        Ok((
+            row.get::<_, String>(0)?,
+            row.get::<_, String>(1)?,
+            row.get::<_, String>(2)?,
+        ))
+    })?;
+    let mut commands = Vec::new();
+    for row in rows {
+        let command = row?;
+        if scope.includes(&command.2) {
+            commands.push(command);
+        }
+    }
+    Ok(commands)
+}
+
 pub fn read_file_summary(conn: &Connection, path: &str) -> Result<Option<FileSummary>> {
     let path = path.strip_prefix("./").unwrap_or(path);
     let file = conn
@@ -524,8 +579,22 @@ pub fn find_symbols(conn: &Connection, query: &str, limit: usize) -> Result<Vec<
 }
 
 pub fn framework_signals(conn: &Connection) -> Result<Vec<String>> {
+    scoped_framework_signals(conn, None)
+}
+
+pub fn framework_signals_for_scope(
+    conn: &Connection,
+    scope: &GuidanceScope,
+) -> Result<Vec<String>> {
+    scoped_framework_signals(conn, Some(scope))
+}
+
+fn scoped_framework_signals(
+    conn: &Connection,
+    scope: Option<&GuidanceScope>,
+) -> Result<Vec<String>> {
     let mut stmt = conn.prepare(
-        "SELECT c.text FROM chunks c
+        "SELECT f.path, c.text FROM chunks c
          JOIN files f ON c.file_id = f.id
          WHERE c.kind IN (
            'package-dependencies',
@@ -535,12 +604,24 @@ pub fn framework_signals(conn: &Connection) -> Result<Vec<String>> {
            'go-dependencies'
          )
          ORDER BY f.path, c.start_line, c.end_line, c.kind, c.name, c.text
-         LIMIT 25",
+         LIMIT ?1",
     )?;
-    let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
+    let rows = stmt.query_map([if scope.is_none() { 25 } else { -1 }], |row| {
+        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+    })?;
     let mut signals = Vec::new();
+    let mut inspected = 0;
     for row in rows {
-        let text = row?.to_ascii_lowercase();
+        let (source, text) = row?;
+        if scope.is_some_and(|scope| !scope.includes(&source)) {
+            continue;
+        }
+        // Apply the cap after scoping so unrelated fixtures cannot exhaust it.
+        if inspected == 25 {
+            break;
+        }
+        inspected += 1;
+        let text = text.to_ascii_lowercase();
         for (needle, name) in [
             ("\"next\"", "Next.js"),
             ("\"react\"", "React"),

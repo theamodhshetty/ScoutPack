@@ -58,6 +58,8 @@ All notable ScoutPack changes are tracked here.
 
 ### Fixed
 
+- Context and template command/framework guidance is scoped to selected files or Git-affected paths and their ancestor configuration directories. Command entries include source and working directory, and unrelated packages no longer exhaust the framework sampling limit. Deleted paths and both sides of a rename retain affected-package guidance.
+
 - Git review summaries detect renames before computing file and line counts. Context packets and review templates show both paths; MCP change records include `previous_path` for detected renames. Snippets still come from the destination at the requested commit.
 
 - Source scanner no longer follows file symlinks into external content or reuses cached entries for non-regular files. Refresh removes source content replaced by symlinks.

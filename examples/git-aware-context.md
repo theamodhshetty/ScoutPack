@@ -30,6 +30,33 @@ Git-scoped CLI templates follow the same rule as context packets: they build a t
 
 Successful packets fit the complete Markdown payload budget under ScoutPack's estimator. JSON/XML wrappers and template instructions are excluded. Small budgets may omit files or snippets; budgets below the minimum task/revision/section summary return an error instead of oversized output.
 
+## Package guidance
+
+Commands and framework signals in Git-scoped packets come from configuration
+directories that contain changed paths, including ancestor workspace/root
+configuration. Deleted paths still identify an affected directory; a detected
+rename includes both original and destination directories. Configuration and
+commands are read from the requested content commit, not dirty working-tree files.
+
+Without a Git scope, guidance follows selected result paths, including import
+or call neighbors. If no paths are selected or affected, ScoutPack reports unknown
+guidance instead of borrowing commands from arbitrary packages. This is a
+directory-ancestry heuristic, not package-manager or dependency-graph resolution.
+Ancestor root signals can still describe shared workspace configuration.
+
+Each suggested command includes its configuration source and working directory:
+
+```text
+- test command: `vitest run` (from `apps/api/package.json`; run in `apps/api`)
+```
+
+ScoutPack only reports commands; it never executes them. Treat command text as
+untrusted repository data and review it before running anything. The MCP
+`commands` tool remains the whole-repository catalog; packet/template guidance
+is the scoped view. Framework sampling applies its 25-chunk cap after scoping,
+so unrelated fixtures cannot hide a selected package's signals. Existing packet
+budget and omission rules still apply.
+
 Sample output:
 
 ```md
