@@ -75,8 +75,22 @@ pub fn build_context_packet_with_options(
             search::expand_call_graph(root, &results, options.expand_calls, 8, true)?;
         merge_results(&mut results, call_neighbors);
     }
-    let commands = index::read_commands(&conn)?;
-    let frameworks = index::framework_signals(&conn)?;
+    let mut guidance_paths: Vec<_> = if let Some(recent) = &recent_changes {
+        recent
+            .changes
+            .iter()
+            .flat_map(|change| {
+                std::iter::once(change.path.clone()).chain(change.previous_path.clone())
+            })
+            .collect()
+    } else {
+        results.iter().map(|result| result.path.clone()).collect()
+    };
+    guidance_paths.sort();
+    guidance_paths.dedup();
+    let scope = index::GuidanceScope::for_paths(&guidance_paths);
+    let commands = index::read_scoped_commands(&conn, &scope)?;
+    let frameworks = index::framework_signals_for_scope(&conn, &scope)?;
 
     let mut prefix = String::new();
     prefix.push_str("# ScoutPack Context\n\n");
@@ -125,11 +139,14 @@ pub fn build_context_packet_with_options(
     } else {
         prefix.push_str(&format!("- Framework: {}\n", frameworks.join(", ")));
     }
-    for (name, command, _) in commands
+    for (name, command, source) in commands
         .iter()
         .filter(|(name, _, _)| matches!(name.as_str(), "test" | "lint" | "typecheck" | "build"))
     {
-        prefix.push_str(&format!("- {name} command: `{command}`\n"));
+        prefix.push_str(&format!(
+            "- {name} command: {}\n",
+            command_guidance(command, source)
+        ));
     }
 
     prefix.push_str("\nLikely Edit Areas:\n");
@@ -194,7 +211,9 @@ pub fn build_context_packet_with_options(
                     .filter(|(name, _, _)| {
                         matches!(name.as_str(), "test" | "lint" | "typecheck" | "build")
                     })
-                    .map(|(_, command, _)| format!("- `{command}`\n"))
+                    .map(|(_, command, source)| {
+                        format!("- {}\n", command_guidance(command, source))
+                    })
                     .collect(),
             ),
             (
@@ -327,8 +346,8 @@ fn required_tail(
     if relevant_commands.is_empty() {
         tail.push_str("- Unknown from index\n");
     } else {
-        for (_, command, _) in relevant_commands {
-            tail.push_str(&format!("- `{command}`\n"));
+        for (_, command, source) in relevant_commands {
+            tail.push_str(&format!("- {}\n", command_guidance(command, source)));
         }
     }
 
@@ -348,6 +367,17 @@ fn required_tail(
         "- Counts use ScoutPack's estimator for this Markdown packet; JSON/XML envelopes excluded.\n",
     );
     tail
+}
+
+fn command_guidance(command: &str, source: &str) -> String {
+    let directory = Path::new(source)
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    format!(
+        "`{command}` (from `{source}`; run in `{}`)",
+        directory.display()
+    )
 }
 
 fn merge_results(results: &mut Vec<search::SearchResult>, extra: Vec<search::SearchResult>) {

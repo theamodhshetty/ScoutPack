@@ -28,7 +28,7 @@ Status: in progress. Commit-only Git packets and MCP context scope parity implem
 - [x] Use merge base for `--branch`; preserve explicit two-endpoint semantics for `--diff` and document the correction.
 - [ ] Test diverged bases, renames, deletions, dirty files, and historical content.
 - [x] Expose equivalent Git scope through MCP; update schemas and docs. Completed October 2, 2026 with schema and stdio regression coverage.
-- [ ] Scope commands/frameworks to affected packages rather than unrelated fixtures.
+- [x] Scope command/framework guidance to selected or Git-affected paths and ancestor configuration directories; retain command source/working-directory hints and cover deletions and cross-package renames. Directory ancestry is a heuristic, not dependency-graph resolution.
 - [ ] Label ambiguous same-name symbol relationships.
 
 Exit: reviewers can identify exactly which content packets contain and why. Unchanged inputs produce identical canonical payloads; freshness is not snapshot identity.
