@@ -40,7 +40,8 @@ Status: planned; depends on correctness gates.
 - [ ] Recheck public release metadata and publish actual verified artifacts through release workflow.
 - [ ] Verify checksums and clean installation on claimed supported platforms.
 - [ ] Validate doctor and one review flow from installed executable.
-- [ ] Test one Codex workflow and one Claude Code workflow.
+- [x] Test one Codex CLI workflow: opt-in synthetic Git/MCP check with successful tool events and committed/dirty provenance validation. Observed October 22, 2026; versions and limits in [AI agent workflows](ai-agent-workflows.md#repeatable-codex-cli-smoke-check).
+- [ ] Test one Claude Code workflow.
 - [ ] Recruit five consenting external reviewers and observe installation failures.
 
 Exit: installation and review work outside maintainer checkout. Templates and intended integrations are not proof of compatibility.

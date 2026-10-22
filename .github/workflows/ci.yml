@@ -12,6 +12,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo fmt --check
       - run: cargo test
+      - run: python3 -m unittest discover -s scripts/tests -p 'test_*.py'
       - run: bash -n install.sh
       - run: bash -n scripts/bench-real-repos.sh
       - run: bash -n scripts/bench-one-repo.sh
