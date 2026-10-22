@@ -37,15 +37,16 @@ scoutpack --help
 
 ## Install From Release Binary
 
-Conditional release infrastructure, not the recommended first-run path today: at the October 1, 2026 check, `v0.1.0` had no binary assets. Use Cargo installation until a release includes binaries and checksums. Confirm assets on [GitHub Releases](https://github.com/theamodhshetty/ScoutPack/releases) before using commands below.
+[v0.1.1](https://github.com/theamodhshetty/ScoutPack/releases/tag/v0.1.1) includes default-feature binaries and SHA-256 sidecars for five targets. Native CI extracts each archive and runs version, pack, context and doctor on Ubuntu 22.04 x86_64/arm64, macOS 15 Intel, macOS 14 Apple Silicon and Windows Server 2022 x86_64. The Unix installer was also checked on macOS arm64 against the published download. Older systems and optional semantic embeddings are not covered by these checks. See [distribution](distribution.md).
 
 macOS/Linux users can install from GitHub Releases without a local Rust toolchain:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/theamodhshetty/ScoutPack/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/theamodhshetty/ScoutPack/v0.1.1/install.sh -o /tmp/scoutpack-install.sh
+sh /tmp/scoutpack-install.sh --version v0.1.1
 ```
 
-Once binaries are published, select their tag with `--version`. Do not use `v0.1.0` unless assets have actually been attached. From a ScoutPack checkout, inspect installer options:
+The installer downloads the matching archive and sidecar, verifies SHA-256, and validates the executable before replacing an installation. These checks detect mismatches; they are not an independent publisher signature. The old `v0.1.0` release has no binary assets. From a ScoutPack checkout, inspect installer options:
 
 ```bash
 sh install.sh --help
@@ -54,10 +55,10 @@ sh install.sh --help
 Install into a custom directory:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/theamodhshetty/ScoutPack/main/install.sh | sh -s -- --dir "$HOME/.local/bin"
+sh /tmp/scoutpack-install.sh --version v0.1.1 --dir "$HOME/.local/bin"
 ```
 
-Windows users can install from the release zip or use the Scoop manifest template in `dist/scoop/scoutpack.json` after release hashes are filled.
+Windows users should download the x86_64 zip and adjacent `.sha256`, compare the archive hash with `Get-FileHash -Algorithm SHA256`, extract it and run `scoutpack.exe --version`. Scoop remains a template until separately verified.
 
 ## Homebrew And Scoop
 
