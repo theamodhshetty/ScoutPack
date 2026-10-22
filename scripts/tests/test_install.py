@@ -87,7 +87,7 @@ class InstallTests(unittest.TestCase):
     @unittest.skipUnless(shutil.which('shasum'), 'requires shasum fallback')
     def test_shasum_fallback(self):
         # A minimal PATH with no sha256sum also covers macOS's hashing route.
-        for name in ('sh', 'awk', 'tar', 'mktemp', 'cp', 'chmod', 'mkdir', 'rm', 'mv', 'shasum', 'perl'):
+        for name in ('sh', 'awk', 'tar', 'gzip', 'mktemp', 'cp', 'chmod', 'mkdir', 'rm', 'mv', 'shasum', 'perl'):
             source = shutil.which(name)
             if source:
                 (self.bin / name).symlink_to(source)
