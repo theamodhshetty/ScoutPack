@@ -128,8 +128,10 @@ async fn main() -> Result<()> {
             branch,
             no_refresh,
         } => {
-            refresh_index(".", no_refresh)?;
             let git_mode = context_git_mode(since, diff, branch)?;
+            if git_mode.is_none() {
+                refresh_index(".", no_refresh)?;
+            }
             let prompt = templates::render_prompt(
                 ".",
                 &name,

@@ -22,6 +22,8 @@ ScoutPack builds and deletes a temporary index for each Git-scoped packet. It sk
 
 `--no-refresh` does not disable snapshot construction. `--semantic` is rejected with Git scope because the temporary index has no embeddings; omit it rather than use working-tree vectors against a different revision.
 
+Git-scoped CLI templates follow the same rule as context packets: they build a temporary index for the requested commit and leave the working-tree index untouched. They do not need `--no-refresh` to avoid creating or refreshing `.scoutpack/`. Invalid scope combinations and malformed ranges fail before indexing. Templates without a Git scope still refresh the working-tree index by default.
+
 Successful packets fit the complete Markdown payload budget under ScoutPack's estimator. JSON/XML wrappers and template instructions are excluded. Small budgets may omit files or snippets; budgets below the minimum task/revision/section summary return an error instead of oversized output.
 
 Sample output:
